@@ -1,8 +1,10 @@
 <?php
 
+use Spatie\Tags\Tag;
+
 return [
     'models' => [
-        'tag' => Spatie\Tags\Tag::class,
+        'tag' => Tag::class,
     ],
     'tables' => [
         'tags' => 'tags',

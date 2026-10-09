@@ -4,18 +4,10 @@ namespace App\Policies;
 
 use App\Models\Share;
 use App\Models\User;
+use App\Services\TenantContext;
 
 class SharePolicy
 {
-    public function before(User $user, string $ability): bool|null
-    {
-        if ($user->hasRole('Platform SuperAdmin')) {
-            return true;
-        }
-
-        return null;
-    }
-
     public function viewAny(User $user): bool
     {
         return $user->currentOrganization() !== null;
@@ -24,20 +16,22 @@ class SharePolicy
     public function view(User $user, Share $share): bool
     {
         return $this->assertOrg($user, $share) && (
-            $user->hasPermissionTo('share.view_any') ||
+            $user->checkPermissionTo('share.view_any') ||
             (int) $share->shared_by === (int) $user->id
         );
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('share.create');
+        return ($id = app(TenantContext::class)->id($user)) !== null
+            && app(TenantContext::class)->canWrite($user, $id)
+            && $user->checkPermissionTo('share.create');
     }
 
     public function update(User $user, Share $share): bool
     {
         return $this->assertOrg($user, $share) && (
-            $user->hasPermissionTo('share.update_any') ||
+            $user->checkPermissionTo('share.update_any') ||
             (int) $share->shared_by === (int) $user->id
         );
     }
@@ -45,14 +39,14 @@ class SharePolicy
     public function delete(User $user, Share $share): bool
     {
         return $this->assertOrg($user, $share) && (
-            $user->hasPermissionTo('share.delete_any') ||
+            $user->checkPermissionTo('share.delete_any') ||
             (int) $share->shared_by === (int) $user->id
         );
     }
 
     private function assertOrg(User $user, Share $share): bool
     {
-        $activeOrg = session('active_organization_id');
+        $activeOrg = app(TenantContext::class)->id($user);
         $document = $share->document;
 
         if ($activeOrg === null || $document === null) {

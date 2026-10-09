@@ -2,19 +2,23 @@
 
 namespace App\Concerns;
 
-use App\Scopes\OrganizationScope;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Organization;
+use App\Scopes\OrganizationScope;
+use App\Services\TenantContext;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 trait BelongsToOrganization
 {
     public static function bootBelongsToOrganization(): void
     {
-        static::addGlobalScope(new OrganizationScope());
+        static::addGlobalScope(new OrganizationScope);
 
         static::creating(function ($model) {
-            if (! $model->organization_id && session()->has('active_organization_id')) {
-                $model->organization_id = session('active_organization_id');
+            if ($model->isFillable('created_by') && auth()->check()) {
+                $model->created_by = auth()->id();
+            }
+            if (! $model->organization_id) {
+                $model->organization_id = app(TenantContext::class)->id();
             }
         });
     }

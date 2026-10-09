@@ -11,9 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Workspace extends Model
 {
+    use BelongsToOrganization;
     use HasFactory;
     use SoftDeletes;
-    use BelongsToOrganization;
 
     protected $fillable = [
         'organization_id',

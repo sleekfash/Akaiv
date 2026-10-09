@@ -1,0 +1,75 @@
+services:
+  php:
+    build: ./docker/php
+    working_dir: /var/www
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?Set a preserved production application key}
+      DB_HOST: pgsql
+      DB_DATABASE: ${DB_DATABASE:?Set database name}
+      DB_USERNAME: ${DB_USERNAME:?Set database user}
+      DB_PASSWORD: ${DB_PASSWORD:?Set database password}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set Redis password}
+      CLAMAV_HOST: clamav
+      QUEUE_CONNECTION: redis
+      SCOUT_DRIVER: "null"
+    volumes:
+      - ./:/var/www:ro
+      - ./storage:/var/www/storage
+      - ./bootstrap/cache:/var/www/bootstrap/cache
+    depends_on:
+      pgsql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      clamav: {condition: service_started}
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./:/var/www:ro
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [php]
+  pgsql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?Set database name}
+      POSTGRES_USER: ${DB_USERNAME:?Set database user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set database password}
+    volumes: ["pgsql_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set Redis password}"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set Redis password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  clamav:
+    image: clamav/clamav:1.5
+    restart: unless-stopped
+    volumes: ["clamav_data:/var/lib/clamav"]
+  horizon:
+    extends: {service: php}
+    command: ["php", "artisan", "horizon"]
+  scheduler:
+    extends: {service: php}
+    command: ["php", "artisan", "schedule:work"]
+volumes:
+  pgsql_data:
+  redis_data:
+  clamav_data:
+  caddy_data:
+  caddy_config:

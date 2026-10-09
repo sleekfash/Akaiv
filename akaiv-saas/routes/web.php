@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\DocumentAgentController;
 use App\Http\Controllers\DownloadDocumentController;
 use App\Http\Controllers\PreviewDocumentController;
 use App\Http\Controllers\ShareController;
@@ -20,7 +19,9 @@ Route::middleware('auth')->get('/dev/tokens', function () {
 
 Route::middleware(['auth', 'throttle:30,1'])->post(
     '/documents/{document}/analyze',
-    [DocumentAgentController::class, 'analyze'],
+    function () {
+        abort(404);
+    },
 )->name('documents.analyze');
 
 Route::middleware(['signed', 'auth', 'throttle:60,1'])->get(

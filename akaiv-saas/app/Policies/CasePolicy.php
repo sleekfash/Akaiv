@@ -4,56 +4,51 @@ namespace App\Policies;
 
 use App\Models\CaseFile;
 use App\Models\User;
+use App\Services\ArchiveAccess;
+use App\Services\TenantContext;
 
 class CasePolicy
 {
-    public function before(User $user, string $ability): bool|null
-    {
-        if ($user->hasRole('Platform SuperAdmin')) {
-            return true;
-        }
-
-        return null;
-    }
-
     public function viewAny(User $user): bool
     {
-        return $user->currentOrganization() !== null;
+        return app(TenantContext::class)->id($user) !== null;
     }
 
     public function view(User $user, CaseFile $case): bool
     {
-        return $this->assertOrg($user, $case) && (
-            $user->hasPermissionTo('case.view') ||
-            $user->hasPermissionTo('case.view_any') ||
+        return app(ArchiveAccess::class)->case($user, $case) && (
+            $user->checkPermissionTo('case.view') ||
+            $user->checkPermissionTo('case.view_any') ||
             (int) $case->created_by === (int) $user->id
         );
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('case.create');
+        return ($id = app(TenantContext::class)->id($user)) !== null
+            && app(TenantContext::class)->canWrite($user, $id)
+            && $user->checkPermissionTo('case.create');
     }
 
     public function update(User $user, CaseFile $case): bool
     {
-        return $this->assertOrg($user, $case) && (
-            $user->hasPermissionTo('case.update_any') ||
-            ($user->hasPermissionTo('case.update_own') && (int) $case->created_by === (int) $user->id)
+        return app(ArchiveAccess::class)->case($user, $case) && app(TenantContext::class)->canWrite($user, (int) $case->organization_id) && (
+            app(TenantContext::class)->canWrite($user, (int) $case->organization_id) && $user->checkPermissionTo('case.update_any') ||
+            ($user->checkPermissionTo('case.update_own') && (int) $case->created_by === (int) $user->id)
         );
     }
 
     public function delete(User $user, CaseFile $case): bool
     {
-        return $this->assertOrg($user, $case) && (
-            $user->hasPermissionTo('case.delete_any') ||
-            ($user->hasPermissionTo('case.delete_own') && (int) $case->created_by === (int) $user->id)
+        return app(ArchiveAccess::class)->case($user, $case) && app(TenantContext::class)->canWrite($user, (int) $case->organization_id) && (
+            app(TenantContext::class)->canWrite($user, (int) $case->organization_id) && $user->checkPermissionTo('case.delete_any') ||
+            ($user->checkPermissionTo('case.delete_own') && (int) $case->created_by === (int) $user->id)
         );
     }
 
     private function assertOrg(User $user, CaseFile $case): bool
     {
-        $activeOrg = session('active_organization_id');
+        $activeOrg = app(TenantContext::class)->id($user);
 
         return $activeOrg !== null && (int) $case->organization_id === (int) $activeOrg;
     }

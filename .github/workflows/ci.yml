@@ -61,12 +61,20 @@ jobs:
 
       - name: Prepare environment
         run: |
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
           cp .env.example .env
           php artisan key:generate
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build and test frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run test:frontend
+          npm run build
       - name: Check code style
         run: vendor/bin/pint --test
-        continue-on-error: true
 
       - name: Run tests
         env:
@@ -80,8 +88,8 @@ jobs:
           REDIS_PASSWORD: null
         run: |
           php artisan migrate --force
+          set -o pipefail
           vendor/bin/pest --colors=never | tee -a "$GITHUB_STEP_SUMMARY"
-        continue-on-error: true
 
   worker:
     name: Cloudflare Worker (typecheck + test)
@@ -100,10 +108,10 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Test
-        run: npm test || true
+        run: npm test

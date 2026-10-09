@@ -12,7 +12,7 @@ export default defineConfig({
         }),
     ],
     build: {
-        manifest: true,
+        manifest: 'manifest.json',
         sourcemap: false,
         rollupOptions: {
             output: {

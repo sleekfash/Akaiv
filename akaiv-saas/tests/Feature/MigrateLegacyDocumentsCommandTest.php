@@ -2,10 +2,15 @@
 
 use App\Models\Document;
 use App\Models\Organization;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     Organization::create([
@@ -26,45 +31,32 @@ function legacyFixture(): string
     return $root;
 }
 
-it('does not write documents during a dry run', function (): void {
+it('dry-run changes no users, records, storage or queued jobs', function (): void {
     Storage::fake('s3');
+    Queue::fake();
     $root = legacyFixture();
-
-    $this->artisan('app:migrate-legacy-documents', [
-        '--dry-run' => true,
-        '--legacy-files' => $root,
-        '--target-org-slug' => 'default',
-    ])->assertSuccessful();
-
-    expect(Document::withoutTenancy()->count())->toBe(0);
+    $counts = [];
+    foreach (['users', 'documents', 'folders', 'import_batches', 'import_items', 'archive_audit_events'] as $table) {
+        $counts[$table] = DB::table($table)->count();
+    }
+    $this->artisan('app:migrate-legacy-documents', ['--dry-run' => true, '--legacy-files' => $root, '--target-org-slug' => 'default'])->assertSuccessful();
+    foreach ($counts as $table => $count) {
+        expect(DB::table($table)->count())->toBe($count);
+    }
+    expect(Storage::disk('s3')->allFiles())->toBeEmpty();
+    Queue::assertNothingPushed();
 });
-
-it('skips PHP executable files and imports documents', function (): void {
+it('requires an explicit authorized actor and stages rather than publishes', function (): void {
     Storage::fake('s3');
+    Queue::fake();
+    $org = Organization::where('slug', 'default')->first();
+    $actor = User::create(['name' => 'Importer', 'email' => 'importer@example.test', 'password' => 'test-secret']);
+    $actor->organizations()->attach($org->id, ['role' => 'member_write']);
+    $actor->givePermissionTo(Permission::findOrCreate('archive.import', 'web'));
     $root = legacyFixture();
-
-    $this->artisan('app:migrate-legacy-documents', [
-        '--legacy-files' => $root,
-        '--target-org-slug' => 'default',
-    ])->assertSuccessful();
-
-    $documents = Document::withoutTenancy()->get();
-
-    expect($documents)->toHaveCount(1)
-        ->and($documents->first()->original_filename)->toContain('Judgment.txt')
-        ->and($documents->first()->status)->toBe('published');
-});
-
-it('parses the embedded timestamp into created_at', function (): void {
-    Storage::fake('s3');
-    $root = legacyFixture();
-
-    $this->artisan('app:migrate-legacy-documents', [
-        '--legacy-files' => $root,
-        '--target-org-slug' => 'default',
-    ])->assertSuccessful();
-
-    $document = Document::withoutTenancy()->first();
-
-    expect($document->created_at->format('Y-m-d'))->toBe('2021-01-23');
+    $this->artisan('app:migrate-legacy-documents', ['--legacy-files' => $root, '--target-org-slug' => 'default', '--actor' => $actor->id])->assertSuccessful();
+    expect(DB::table('import_items')->count())->toBe(1)
+        ->and(Document::withoutGlobalScopes()->count())->toBe(0)
+        ->and(DB::table('import_items')->first()->status)->toBe('awaiting_metadata');
+    expect(Storage::disk('s3')->allFiles())->toBeEmpty();
 });

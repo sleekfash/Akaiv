@@ -24,6 +24,9 @@ class OcrDocumentJob implements ShouldQueue
 
     public function handle(): void
     {
+        if (! config('archive.ocr_enabled')) {
+            return;
+        }
         if (! $this->document->ocr_required || $this->document->ocr_completed) {
             return;
         }
