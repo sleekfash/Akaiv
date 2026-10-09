@@ -2,88 +2,87 @@
 
 namespace App\Jobs;
 
+use App\Models\Document;
+use App\Services\ArchiveAudit;
+use App\Services\ClamScanner;
+use App\Services\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Document;
-use Socket\Raw\Factory;
-use Xenolope\Quahog\Client;
-use Exception;
 
 class VirusScanDocumentJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable;
 
-    public int $tries = 2;
+    public int $tries = 3;
+
     public int $timeout = 600;
 
-    public function __construct(public Document $document) {}
+    public int $documentId;
+
+    public int $organizationId;
+
+    public ?string $revision;
+
+    public function __construct(Document $document)
+    {
+        $this->documentId = $document->id;
+        $this->organizationId = $document->organization_id;
+        $this->revision = $document->file_revision;
+    }
 
     public function handle(): void
     {
-        $path = $this->document->storage_path;
-        $disk = Storage::disk($this->document->storage_disk);
-
-        if (! $disk->exists($path)) {
-            $this->document->updateQuietly([
-                'status' => 'quarantined',
-                'virus_scanned' => false,
-            ]);
-            return;
-        }
-
-        try {
-            $stream = $disk->readStream($path);
-            $socket = (new Factory())->createClient(sprintf(
-                'tcp://%s:%d',
-                config('services.clamav.host'),
-                config('services.clamav.port', 3310),
-            ));
-            $clam = new Client($socket);
-            $result = $clam->scanResourceStream($stream);
-            $clam->disconnect();
-
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-
-            if ($result->isFound()) {
-                $this->document->updateQuietly([
-                    'status' => 'quarantined',
-                    'virus_scanned' => true,
-                    'virus_found' => true,
-                    'virus_scanned_at' => now(),
-                    'metadata' => array_merge($this->document->metadata ?? [], [
-                        'virus_signature' => $result->getReason(),
-                    ]),
-                ]);
-                activity()
-                    ->on($this->document)
-                    ->withProperties(['signature' => $result->getReason()])
-                    ->log('document.virus_detected');
+        app(TenantContext::class)->run($this->organizationId, function () {
+            $document = Document::find($this->documentId);
+            if (! $document || $document->file_revision !== $this->revision || $document->scan_state === 'clean') {
                 return;
             }
-        } catch (Exception $e) {
-            report($e);
-            $this->document->updateQuietly([
-                'status' => 'quarantined',
-            ]);
-            $this->release(300);
-            return;
-        }
+            $source = null;
+            $local = null;
+            try {
+                $source = Storage::disk($document->storage_disk)->readStream($document->storage_path);
+                if (! is_resource($source)) {
+                    throw new \RuntimeException('Missing file');
+                }
+                $local = tmpfile();
+                if (! is_resource($local)) {
+                    throw new \RuntimeException('Cannot create scan snapshot');
+                }
+                stream_copy_to_stream($source, $local);
+                if (! $document->sha256_checksum || ! hash_equals($document->sha256_checksum, hash_file('sha256', stream_get_meta_data($local)['uri']))) {
+                    throw new \RuntimeException('File checksum mismatch');
+                }
+                rewind($local);
+                $clean = app(ClamScanner::class)->scan($local);
+                $this->record($clean ? 'clean' : 'infected', $clean);
+            } catch (\Throwable $e) {
+                $this->record('error', false);
+                throw $e;
+            } finally {
+                if (is_resource($source)) {
+                    fclose($source);
+                }
+                if (is_resource($local)) {
+                    fclose($local);
+                }
+            }
+        });
+    }
 
-        $this->document->updateQuietly([
-            'virus_scanned' => true,
-            'virus_found' => false,
-            'virus_scanned_at' => now(),
-            'status' => $this->document->status === 'uploading' ? 'published' : $this->document->status,
-        ]);
-
-        OcrDocumentJob::dispatch($this->document)->delay(now()->addSeconds(3));
-        ThumbnailDocumentJob::dispatch($this->document)->delay(now()->addSeconds(5));
-        IndexDocumentJob::dispatch($this->document)->delay(now()->addSeconds(10));
+    private function record(string $state, bool $clean): void
+    {
+        DB::transaction(function () use ($state) {
+            $record = Document::whereKey($this->documentId)->lockForUpdate()->first();
+            if (! $record || $record->file_revision !== $this->revision) {
+                return;
+            }
+            $record->forceFill(['scan_state' => $state, 'virus_scanned' => $state !== 'error', 'virus_found' => $state === 'infected', 'virus_scanned_at' => now()])->saveQuietly();
+            app(ArchiveAudit::class)->append($this->organizationId, null, 'FILE_SCAN_RESULT', Document::class, (string) $record->id, ['revision' => $this->revision, 'result' => $state]);
+            // Phase 1 deliberately dispatches no OCR, text preprocessing, AI, or content indexer.
+        });
     }
 }

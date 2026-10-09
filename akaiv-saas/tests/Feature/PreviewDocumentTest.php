@@ -4,12 +4,13 @@ use App\Models\Document;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     Permission::create(['name' => 'document.view', 'guard_name' => 'web']);
@@ -40,6 +41,8 @@ it('serves a scanned private document through a valid signed preview URL', funct
         'mime_type' => 'text/plain',
         'status' => 'published',
         'virus_scanned' => true,
+        'scan_state' => 'clean',
+        'sha256_checksum' => hash('sha256', 'confidential judgment'),
     ]);
     Storage::disk('private')->put($document->storage_path, 'confidential judgment');
 
@@ -76,6 +79,8 @@ it('rejects an invalid preview signature', function (): void {
         'storage_path' => 'documents/judgment.txt',
         'status' => 'published',
         'virus_scanned' => true,
+        'scan_state' => 'clean',
+        'sha256_checksum' => hash('sha256', 'confidential judgment'),
     ]);
     session(['active_organization_id' => $organization->id]);
 

@@ -12,6 +12,7 @@ class DocumentAgentController extends Controller
 {
     public function analyze(Request $request, Document $document): JsonResponse
     {
+        abort_unless(config('archive.ai_enabled'), 404);
         $this->authorize('view', $document);
 
         $endpoint = config('services.document_agent.url');

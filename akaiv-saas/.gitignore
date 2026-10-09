@@ -23,3 +23,8 @@ Thumbs.db
 .php-cs-fixer.cache
 .pest.cache
 coverage/
+
+.phpunit.cache/
+/storage/framework/cache/
+/storage/exports/
+/storage/framework/testing/

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CaseResource\Pages;
 use App\Filament\Resources\CaseResource\RelationManagers\DocumentsRelationManager;
 use App\Models\CaseFile;
+use App\Services\SealedCases;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
@@ -13,8 +14,10 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
@@ -35,7 +38,8 @@ class CaseResource extends Resource
         return $form->schema([
             Section::make('Case identity')->schema([
                 TextInput::make('case_number')->maxLength(150)->unique(ignoreRecord: true),
-                TextInput::make('suit_number')->maxLength(150)->unique(ignoreRecord: true),
+                TextInput::make('suit_number')->maxLength(150),
+                TextInput::make('subject_matter')->maxLength(256),
                 TextInput::make('title')->required()->maxLength(500)->columnSpanFull(),
                 Select::make('workspace_id')->label('Workspace')
                     ->relationship('workspace', 'name')->searchable()->preload(),
@@ -73,6 +77,8 @@ class CaseResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('suit_number')->searchable(query: fn ($query, string $search) => $query->where(fn ($q) => $q->whereRaw('LOWER(suit_number) LIKE ?', ['%'.mb_strtolower($search).'%'])->orWhere('normalized_suit_number', 'like', '%'.strtoupper(preg_replace('/\s+/u', '', $search)).'%')))->sortable(),
+                TextColumn::make('subject_matter')->searchable()->sortable(),
                 TextColumn::make('case_number')->searchable()->sortable(),
                 TextColumn::make('title')->searchable()->sortable()->wrap(),
                 TextColumn::make('court_name')->toggleable(),
@@ -88,8 +94,13 @@ class CaseResource extends Resource
                     'archived' => 'Archived',
                 ]),
                 SelectFilter::make('workspace')->relationship('workspace', 'name'),
+                Filter::make('delivered')->form([DatePicker::make('from'), DatePicker::make('until')])->query(fn ($query, array $data) => $query->when($data['from'] ?? null, fn ($q, $date) => $q->whereHas('documents', fn ($d) => $d->whereDate('date_delivered', '>=', $date)))->when($data['until'] ?? null, fn ($q, $date) => $q->whereHas('documents', fn ($d) => $d->whereDate('date_delivered', '<=', $date)))),
             ])
             ->actions([
+                Action::make('seal')->label('Seal / set grants')
+                    ->visible(fn ($record) => auth()->user()->checkPermissionTo('case.seal'))
+                    ->form([Select::make('user_ids')->label('Explicitly authorized members')->multiple()->options(fn ($record) => $record->organization->users()->pluck('name', 'users.id')->all())->required()])
+                    ->requiresConfirmation()->action(fn ($record, array $data) => app(SealedCases::class)->seal($record, auth()->user(), $data['user_ids'])),
                 EditAction::make(),
             ])
             ->bulkActions([]);

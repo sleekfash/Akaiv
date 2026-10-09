@@ -7,8 +7,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     Permission::create(['name' => 'document.view', 'guard_name' => 'web']);
@@ -45,50 +46,11 @@ it('rejects unauthenticated analysis requests', function (): void {
     $this->postJson('/documents/'.$document->uuid.'/analyze')->assertUnauthorized();
 });
 
-it('returns a bad gateway when the worker fails', function (): void {
+it('does not contact the worker in Phase 1 even when configured', function (): void {
     [$organization, $user, $document] = agentContext();
     session(['active_organization_id' => $organization->id]);
-
-    config([
-        'services.document_agent.url' => 'https://worker.example.test',
-        'services.document_agent.secret' => 'secret',
-    ]);
-
-    Http::fake(['*' => Http::response(['error' => 'boom'], 500)]);
-
-    $this->actingAs($user)
-        ->postJson('/documents/'.$document->uuid.'/analyze')
-        ->assertStatus(502);
-});
-
-it('returns the worker analysis on success', function (): void {
-    [$organization, $user, $document] = agentContext();
-    session(['active_organization_id' => $organization->id]);
-
-    config([
-        'services.document_agent.url' => 'https://worker.example.test',
-        'services.document_agent.secret' => 'secret',
-    ]);
-
-    Http::fake(['*' => Http::response(['summary' => 'A short judgment.'], 200)]);
-
-    $this->actingAs($user)
-        ->postJson('/documents/'.$document->uuid.'/analyze')
-        ->assertOk()
-        ->assertJson(['summary' => 'A short judgment.']);
-});
-
-it('errors when the worker is not configured', function (): void {
-    [$organization, $user, $document] = agentContext();
-    session(['active_organization_id' => $organization->id]);
-
-    config([
-        'services.document_agent.url' => null,
-        'services.document_agent.secret' => null,
-    ]);
-
-    $this->withoutExceptionHandling();
-    $this->expectException(RuntimeException::class);
-
-    $this->actingAs($user)->postJson('/documents/'.$document->uuid.'/analyze');
+    config(['services.document_agent.url' => 'https://worker.example.test', 'services.document_agent.secret' => 'synthetic-test-secret']);
+    Http::fake();
+    $this->actingAs($user)->postJson('/documents/'.$document->uuid.'/analyze')->assertNotFound();
+    Http::assertNothingSent();
 });
