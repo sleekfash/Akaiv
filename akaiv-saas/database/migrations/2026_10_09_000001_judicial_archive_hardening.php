@@ -100,7 +100,7 @@ return new class extends Migration
             DB::statement("ALTER TABLE documents ADD CONSTRAINT document_type_check CHECK (judicial_document_type IS NULL OR judicial_document_type IN ('judgment','ruling','order','case_file','transcript'))");
             DB::statement('ALTER TABLE documents ADD CONSTRAINT document_single_parent CHECK (case_id IS NULL OR proceeding_id IS NULL)');
             DB::unprepared(<<<'SQL'
-CREATE FUNCTION archive_audit_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION archive_audit_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'Archive audit events are append only'; END $$;
 CREATE TRIGGER archive_audit_immutable BEFORE UPDATE OR DELETE ON archive_audit_events
 FOR EACH ROW EXECUTE FUNCTION archive_audit_immutable();
