@@ -95,6 +95,12 @@ class VirusScanDocumentJob implements ShouldQueue
                 @unlink($input);
             }
         }
+        if ($document && $document->virus_found) {
+            activity()->on($document)->withProperties([
+                'signature' => $document->metadata['virus_signature'] ?? 'Detected',
+                'sha256_checksum' => $document->sha256_checksum,
+            ])->log('document.virus_detected');
+        }
         if ($document && ! $document->virus_found) {
             OcrDocumentJob::dispatch($document)->afterCommit();
             ThumbnailDocumentJob::dispatch($document)->delay(now()->addSeconds(5))->afterCommit();

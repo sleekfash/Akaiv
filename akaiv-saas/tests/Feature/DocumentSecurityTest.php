@@ -59,6 +59,7 @@ it('quarantines infected input without downstream work', function () {
     $this->mock(DocumentAntivirus::class)->shouldReceive('scan')->andReturn(['verdict' => 'infected', 'reason' => 'Test signature']);
     (new VirusScanDocumentJob($document))->handle();
     expect($document->fresh()->virus_found)->toBeTrue()->and($document->fresh()->status)->toBe('quarantined');
+    expect(DB::table('activity_log')->where('description', 'document.virus_detected')->count())->toBe(1);
     Bus::assertNotDispatched(OcrDocumentJob::class);
 });
 

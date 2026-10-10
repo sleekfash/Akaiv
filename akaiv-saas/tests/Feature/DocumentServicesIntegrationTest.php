@@ -1,8 +1,8 @@
 <?php
 
+use App\Jobs\VirusScanDocumentJob;
 use App\Models\Document;
 use App\Models\Organization;
-use App\Services\DocumentAntivirus;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -72,12 +72,19 @@ it('runs clean and infected documents through real storage antivirus queues and 
     $unsigned = rtrim(config('filesystems.disks.s3.endpoint'), '/').'/'.config('filesystems.disks.s3.bucket').'/'.$clean->storage_path;
     expect(Http::get($unsigned)->status())->toBeIn([401, 403]);
     expect(Http::get($disk->temporaryUrl($clean->storage_path, now()->addMinute()))->body())->toBe($clean->extracted_text);
-    $temporary = tempnam(sys_get_temp_dir(), 'akaiv-outage-');
-    file_put_contents($temporary, 'Clean but scanner unavailable');
-    config(['services.clamav.port' => 9]);
-    try {
-        expect(fn () => app(DocumentAntivirus::class)->scan($temporary))->toThrow(Throwable::class);
-    } finally {
-        @unlink($temporary);
-    }
+    $outage = Document::withoutEvents(fn () => Document::create([
+        'uuid' => (string) Str::uuid(), 'slug' => 'scanner-outage',
+        'organization_id' => $org->id, 'friendly_name' => 'Scanner outage', 'original_filename' => 'outage.txt',
+        'storage_disk' => 's3', 'storage_path' => $clean->storage_path, 'file_extension' => 'txt',
+        'sha256_checksum' => $clean->sha256_checksum, 'status' => 'uploading', 'ocr_required' => true,
+    ]));
+    $job = new VirusScanDocumentJob($outage);
+    $job->tries = 1;
+    dispatch($job);
+    $worker = new Process([PHP_BINARY, 'artisan', 'queue:work', 'redis', '--stop-when-empty', '--sleep=1'], base_path(), ['CLAMAV_PORT' => '9']);
+    $worker->setTimeout(60)->mustRun();
+    expect($outage->fresh()->status)->toBe('quarantined')->and($outage->fresh()->virus_scanned)->toBeFalse()
+        ->and($outage->fresh()->ocr_completed)->toBeFalse();
+    expect(DB::table('failed_jobs')->count())->toBe(1);
+    expect(Queue::connection('redis')->size())->toBe(0);
 });

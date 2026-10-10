@@ -98,6 +98,7 @@ jobs:
           tests/Feature/DocumentSecurityTest.php tests/Feature/DocumentServicesIntegrationTest.php
           database/migrations/2026_10_10_000001_create_document_uploads_table.php
           config/services.php config/queue.php
+          database/migrations/2026_10_11_000001_create_failed_jobs_table.php
 
   real-services:
     runs-on: ubuntu-24.04
