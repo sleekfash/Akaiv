@@ -164,4 +164,3 @@ class DocumentConvertersIntegrationTest extends TestCase
         return $image;
     }
 }
-
