@@ -39,7 +39,7 @@ it('quarantines a document whose file is missing from storage', function (): voi
     Storage::fake('private');
     $document = pipelineDocument();
 
-    (new VirusScanDocumentJob($document))->handle();
+    expect(fn () => (new VirusScanDocumentJob($document))->handle())->toThrow(RuntimeException::class);
 
     expect($document->fresh()->status)->toBe('quarantined')
         ->and($document->fresh()->virus_scanned)->toBeFalse();
@@ -75,7 +75,7 @@ it('extracts text before dispatching its search index job', function (): void {
     Bus::fake();
     Storage::fake('private');
     $document = pipelineDocument(['status' => 'published', 'virus_scanned' => true,
-        'file_extension' => 'txt', 'mime_type' => 'text/plain', 'storage_path' => 'documents/notes.txt']);
+        'file_extension' => 'txt', 'mime_type' => 'text/plain', 'sha256_checksum' => hash('sha256', 'Complete text from the archive.'), 'storage_path' => 'documents/notes.txt']);
     Storage::disk('private')->put($document->storage_path, 'Complete text from the archive.');
 
     (new OcrDocumentJob($document))->handle(app(DocumentTextExtractor::class));
@@ -102,7 +102,7 @@ it('never extracts or indexes an unscanned document', function (): void {
 it('records extraction failure without claiming completion or indexing', function (): void {
     Bus::fake();
     Storage::fake('private');
-    $document = pipelineDocument(['status' => 'published', 'virus_scanned' => true]);
+    $document = pipelineDocument(['status' => 'published', 'virus_scanned' => true, 'sha256_checksum' => hash('sha256', 'Unreadable PDF')]);
     Storage::disk('private')->put($document->storage_path, 'Unreadable PDF');
     $extractor = Mockery::mock(DocumentTextExtractor::class);
     $extractor->shouldReceive('extract')->once()->andThrow(new RuntimeException('Conversion failed'));

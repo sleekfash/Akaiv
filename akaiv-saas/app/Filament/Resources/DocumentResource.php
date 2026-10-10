@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DocumentResource\Pages;
 use App\Models\Document;
 use App\Services\DocumentFormats;
+use App\Services\DocumentUploads;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Section;
@@ -21,7 +22,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class DocumentResource extends Resource
@@ -54,8 +54,10 @@ class DocumentResource extends Resource
                     ->disk('s3')
                     ->directory('documents')
                     ->visibility('private')
+                    ->previewable(false)
+                    ->getUploadedFileUsing(fn (): array => ['name' => 'Stored document', 'size' => 0, 'type' => 'application/octet-stream', 'url' => null])
                     ->storeFileNamesIn('original_filename')
-                    ->getUploadedFileNameForStorageUsing(fn (TemporaryUploadedFile $file): string => Str::uuid().'.'.strtolower($file->getClientOriginalExtension()))
+                    ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(DocumentUploads::class)->store($file, auth()->user()))
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->acceptedFileTypes(DocumentFormats::acceptedMimeTypes())
                     ->helperText('PDF, Word, Excel, PowerPoint, OpenDocument, text, RTF, and common image formats. Files are scanned before access.')

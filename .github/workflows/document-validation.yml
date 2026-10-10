@@ -71,7 +71,7 @@ jobs:
           touch .env
           composer install --no-interaction --prefer-dist --no-progress
       - name: Focused migration and isolation tests
-        run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|TenantIsolationTest'
+        run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|DocumentSecurityTest|TenantIsolationTest'
       - name: Full application tests
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: vendor/bin/pest --colors=never
@@ -95,3 +95,97 @@ jobs:
           tests/Feature/MigrateLegacyDocumentsCommandTest.php
           tests/Feature/DocumentPipelineTest.php tests/Feature/DocumentConvertersIntegrationTest.php
           tests/Unit/DocumentTextExtractorTest.php
+          tests/Feature/DocumentSecurityTest.php tests/Feature/DocumentServicesIntegrationTest.php
+          database/migrations/2026_10_10_000001_create_document_uploads_table.php
+          config/services.php config/queue.php
+
+  real-services:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: akaiv_services
+          POSTGRES_USER: akaiv_test
+          POSTGRES_PASSWORD: disposable-test-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U akaiv_test -d akaiv_services"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+      meilisearch:
+        image: getmeili/meilisearch:v1.8
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: synthetic-meili-test-key
+        ports: ['7700:7700']
+    defaults:
+      run:
+        working-directory: akaiv-saas
+        shell: bash
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://localhost
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: akaiv_services
+      DB_USERNAME: akaiv_test
+      DB_PASSWORD: disposable-test-password
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: 127.0.0.1
+      MAIL_MAILER: array
+      SCOUT_DRIVER: meilisearch
+      MEILISEARCH_HOST: http://127.0.0.1:7700
+      MEILISEARCH_KEY: synthetic-meili-test-key
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: akaiv-test
+      AWS_SECRET_ACCESS_KEY: synthetic-storage-password
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: akaiv-services-test
+      AWS_ENDPOINT: http://127.0.0.1:9000
+      AWS_USE_PATH_STYLE_ENDPOINT: 'true'
+      CLAMAV_HOST: 127.0.0.1
+      CLAMAV_PORT: '3310'
+      AKAIV_RUN_SERVICES: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: akaiv-saas
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_pgsql, pdo_mysql, pdo_sqlite, bcmath, exif, pcntl, zip, gd, redis, sockets
+          coverage: none
+      - name: Start private storage and real antivirus
+        run: |
+          docker run -d --name akaiv-test-storage -p 9000:9000 -e MINIO_ROOT_USER=akaiv-test -e MINIO_ROOT_PASSWORD=synthetic-storage-password minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          docker run -d --name akaiv-test-antivirus -p 3310:3310 clamav/clamav:stable
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:9000/minio/health/live && (echo PING | nc -w 2 127.0.0.1 3310 | grep -q PONG); then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs --tail=50 akaiv-test-antivirus
+          exit 1
+      - name: Install locked dependencies
+        run: |
+          mkdir -p bootstrap/cache storage/framework/{cache/data,sessions,views} storage/logs
+          touch .env
+          composer install --no-interaction --prefer-dist --no-progress
+      - name: Verify real service behavior
+        run: vendor/bin/pest --colors=never --filter=DocumentServicesIntegrationTest
+      - name: Service diagnostics on failure
+        if: failure()
+        run: |
+          docker logs --tail=50 akaiv-test-antivirus
+          test ! -f storage/logs/laravel.log || tail -100 storage/logs/laravel.log

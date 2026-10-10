@@ -3,15 +3,15 @@
 namespace App\Jobs;
 
 use App\Models\Document;
-use Exception;
+use App\Services\DocumentAntivirus;
+use App\Services\DocumentProcessingVersion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
-use Socket\Raw\Factory;
-use Xenolope\Quahog\Client;
+use RuntimeException;
+use Throwable;
 
 class VirusScanDocumentJob implements ShouldQueue
 {
@@ -21,72 +21,65 @@ class VirusScanDocumentJob implements ShouldQueue
 
     public int $timeout = 600;
 
-    public function __construct(public Document $document) {}
+    public int $backoff = 300;
+
+    public DocumentProcessingVersion $version;
+
+    public function __construct(public Document $document)
+    {
+        $this->version = new DocumentProcessingVersion($document);
+    }
 
     public function handle(): void
     {
-        $path = $this->document->storage_path;
-        $disk = Storage::disk($this->document->storage_disk);
-
-        if (! $disk->exists($path)) {
-            $this->document->updateQuietly([
-                'status' => 'quarantined',
-                'virus_scanned' => false,
-            ]);
-
+        $current = $this->version->query()->first();
+        if (! $current || $current->status === 'deleted' || $current->virus_scanned) {
             return;
         }
-
+        $input = null;
         try {
-            $stream = $disk->readStream($path);
-            $socket = (new Factory)->createClient(sprintf(
-                'tcp://%s:%d',
-                config('services.clamav.host'),
-                config('services.clamav.port', 3310),
-            ));
-            $clam = new Client($socket);
-            $result = $clam->scanResourceStream($stream);
-            $clam->disconnect();
-
-            if (is_resource($stream)) {
-                fclose($stream);
+            $input = $this->version->input();
+            $result = app(DocumentAntivirus::class)->scan($input);
+            if (! in_array($result['verdict'] ?? null, ['clean', 'infected'], true)) {
+                throw new RuntimeException('Antivirus did not return a valid verdict.');
             }
-
-            if ($result->isFound()) {
-                $this->document->updateQuietly([
-                    'status' => 'quarantined',
-                    'virus_scanned' => true,
-                    'virus_found' => true,
-                    'virus_scanned_at' => now(),
-                    'metadata' => array_merge($this->document->metadata ?? [], [
-                        'virus_signature' => $result->getReason(),
-                    ]),
+            $document = $this->version->apply(function (Document $document) use ($result) {
+                if ($document->virus_scanned) {
+                    return false;
+                }
+                $infected = $result['verdict'] === 'infected';
+                $metadata = $document->metadata ?? [];
+                $target = $metadata['pending_status'] ?? ($document->status === 'quarantined' ? 'draft' : $document->status);
+                unset($metadata['virus_signature'], $metadata['scan_error']);
+                if ($infected) {
+                    $metadata['virus_signature'] = $result['reason'] ?? 'Detected';
+                }
+                $document->updateQuietly([
+                    'virus_scanned' => true, 'virus_found' => $infected, 'virus_scanned_at' => now(),
+                    'status' => $infected ? 'quarantined' : ($target === 'uploading' ? 'published' : $target),
+                    'metadata' => $metadata,
                 ]);
-                activity()
-                    ->on($this->document)
-                    ->withProperties(['signature' => $result->getReason()])
-                    ->log('document.virus_detected');
-
-                return;
+            });
+        } catch (Throwable $exception) {
+            $this->version->apply(function (Document $document) {
+                if ($document->virus_scanned) {
+                    return false;
+                }
+                $metadata = $document->metadata ?? [];
+                $metadata['pending_status'] ??= $document->status === 'uploading' ? 'published' : $document->status;
+                $metadata['scan_error'] = true;
+                $document->updateQuietly(['status' => 'quarantined', 'virus_scanned' => false,
+                    'virus_found' => false, 'virus_scanned_at' => null, 'metadata' => $metadata]);
+            });
+            throw $exception;
+        } finally {
+            if ($input !== null) {
+                @unlink($input);
             }
-        } catch (Exception $e) {
-            report($e);
-            $this->document->updateQuietly([
-                'status' => 'quarantined',
-            ]);
-            $this->release(300);
-
-            return;
         }
-
-        $this->document->updateQuietly([
-            'virus_scanned' => true,
-            'virus_found' => false,
-            'virus_scanned_at' => now(),
-            'status' => $this->document->status === 'uploading' ? 'published' : $this->document->status,
-        ]);
-
-        OcrDocumentJob::dispatch($this->document);
-        ThumbnailDocumentJob::dispatch($this->document)->delay(now()->addSeconds(5));
+        if ($document && ! $document->virus_found) {
+            OcrDocumentJob::dispatch($document)->afterCommit();
+            ThumbnailDocumentJob::dispatch($document)->delay(now()->addSeconds(5))->afterCommit();
+        }
     }
 }

@@ -26,7 +26,7 @@ class DocumentStoredFile
                     throw new RuntimeException('Unable to allocate file validation input.');
                 }
                 try {
-                    if (stream_copy_to_stream($source, $destination) === false) {
+                    if (stream_copy_to_stream($source, $destination, 268435457) === false) {
                         throw new RuntimeException('Unable to read upload.');
                     }
                 } finally {
@@ -35,7 +35,7 @@ class DocumentStoredFile
             } finally {
                 fclose($source);
             }
-            if (filesize($temporary) === 0) {
+            if (filesize($temporary) === 0 || filesize($temporary) > 268435456) {
                 throw new RuntimeException('Empty upload.');
             }
             $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));

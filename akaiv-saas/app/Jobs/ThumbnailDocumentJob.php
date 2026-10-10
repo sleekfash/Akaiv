@@ -3,12 +3,15 @@
 namespace App\Jobs;
 
 use App\Models\Document;
+use App\Services\DocumentProcessingVersion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class ThumbnailDocumentJob implements ShouldQueue
@@ -19,44 +22,42 @@ class ThumbnailDocumentJob implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function __construct(public Document $document) {}
+    public DocumentProcessingVersion $version;
+
+    public function __construct(public Document $document)
+    {
+        $this->version = new DocumentProcessingVersion($document);
+    }
 
     public function handle(): void
     {
-        $fresh = Document::where('organization_id', $this->document->organization_id)
-            ->whereKey($this->document->id)->first();
-        if (! $fresh || ! $fresh->virus_scanned || $fresh->virus_found
-            || in_array($fresh->status, ['deleted', 'quarantined'], true)) {
+        $document = $this->version->query()->first();
+        if (! $document || ! DocumentProcessingVersion::clean($document) || strtolower((string) $document->file_extension) !== 'pdf') {
             return;
         }
-        $this->document = $fresh;
-
-        if (strtolower((string) $this->document->file_extension) !== 'pdf') {
-            return;
-        }
-
-        $disk = Storage::disk($this->document->storage_disk);
-        if (! $disk->exists($this->document->storage_path)) {
-            return;
-        }
-
-        $inputPath = tempnam(sys_get_temp_dir(), 'akaiv-thumb-');
-        $outputPath = $inputPath.'.png';
-
+        $input = $this->version->input();
+        $output = $input.'.png';
+        $thumbnail = 'thumbnails/'.$document->uuid.'/'.Str::uuid().'.png';
+        $disk = Storage::disk($document->storage_disk);
+        $committed = false;
         try {
-            file_put_contents($inputPath, $disk->get($this->document->storage_path));
-
-            $process = new Process([
-                'pdftoppm', '-f', '1', '-l', '1', '-png', '-singlefile', '-scale-to', '1200',
-                $inputPath, $inputPath,
-            ]);
-            $process->mustRun();
-
-            $thumbnailPath = 'thumbnails/'.$this->document->uuid.'.png';
-            Storage::disk('private')->put($thumbnailPath, file_get_contents($outputPath));
+            $process = new Process(['pdftoppm', '-f', '1', '-l', '1', '-png', '-singlefile', '-scale-to', '1200', $input, $input]);
+            $process->setTimeout(240)->mustRun();
+            if (! $disk->put($thumbnail, file_get_contents($output), ['visibility' => 'private'])) {
+                throw new RuntimeException('Unable to store thumbnail.');
+            }
+            $committed = $this->version->apply(function (Document $document) use ($thumbnail) {
+                if (! DocumentProcessingVersion::clean($document)) {
+                    return false;
+                }
+                $document->updateQuietly(['metadata' => array_merge($document->metadata ?? [], ['thumbnail_path' => $thumbnail])]);
+            }) !== null;
         } finally {
-            @unlink($inputPath);
-            @unlink($outputPath);
+            @unlink($input);
+            @unlink($output);
+            if (! $committed) {
+                $disk->delete($thumbnail);
+            }
         }
     }
 }
