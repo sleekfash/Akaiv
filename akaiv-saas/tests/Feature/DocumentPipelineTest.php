@@ -8,10 +8,11 @@ use App\Models\Document;
 use App\Models\Organization;
 use App\Services\DocumentTextExtractor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 function pipelineDocument(array $attributes = []): Document
 {

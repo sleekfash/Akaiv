@@ -2,22 +2,23 @@
 
 namespace App\Jobs;
 
+use App\Models\Document;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Document;
 use Socket\Raw\Factory;
 use Xenolope\Quahog\Client;
-use Exception;
 
 class VirusScanDocumentJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 600;
 
     public function __construct(public Document $document) {}
@@ -32,12 +33,13 @@ class VirusScanDocumentJob implements ShouldQueue
                 'status' => 'quarantined',
                 'virus_scanned' => false,
             ]);
+
             return;
         }
 
         try {
             $stream = $disk->readStream($path);
-            $socket = (new Factory())->createClient(sprintf(
+            $socket = (new Factory)->createClient(sprintf(
                 'tcp://%s:%d',
                 config('services.clamav.host'),
                 config('services.clamav.port', 3310),
@@ -64,6 +66,7 @@ class VirusScanDocumentJob implements ShouldQueue
                     ->on($this->document)
                     ->withProperties(['signature' => $result->getReason()])
                     ->log('document.virus_detected');
+
                 return;
             }
         } catch (Exception $e) {
@@ -72,6 +75,7 @@ class VirusScanDocumentJob implements ShouldQueue
                 'status' => 'quarantined',
             ]);
             $this->release(300);
+
             return;
         }
 

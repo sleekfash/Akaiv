@@ -54,7 +54,8 @@ class DocumentConvertersIntegrationTest extends TestCase
         $source = $this->directory.'/fixture.'.$sourceExtension;
         $body = match ($family) {
             'text' => '<office:text><text:p>ARCHIVE VALIDATION DOCUMENT</text:p></office:text>',
-            'spreadsheet' => '<office:spreadsheet><table:table table:name="Records"><table:table-row>'
+            'spreadsheet' => '<office:spreadsheet><table:table table:name="Records" table:style-name="Sheet">'
+                .'<table:table-column table:style-name="Column"/><table:table-row>'
                 .'<table:table-cell office:value-type="string"><text:p>ARCHIVE VALIDATION DOCUMENT</text:p>'
                 .'</table:table-cell></table:table-row></table:table></office:spreadsheet>',
             'presentation' => '<office:presentation><draw:page draw:name="Slide1" draw:master-page-name="Default">'
@@ -131,6 +132,10 @@ class DocumentConvertersIntegrationTest extends TestCase
             .'office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.'.$family.'">'
             .'<office:automatic-styles><style:style style:name="NewPage" style:family="paragraph">'
             .'<style:paragraph-properties fo:break-before="page"/></style:style>'
+            .'<style:style style:name="Sheet" style:family="table" style:master-page-name="Default">'
+            .'<style:table-properties table:display="true"/></style:style>'
+            .'<style:style style:name="Column" style:family="table-column">'
+            .'<style:table-column-properties style:column-width="20cm"/></style:style>'
             .'<style:page-layout style:name="Layout"><style:page-layout-properties fo:page-width="28cm" '
             .'fo:page-height="21cm" style:print-orientation="landscape"/></style:page-layout></office:automatic-styles>'
             .'<office:master-styles><style:master-page style:name="Default" style:page-layout-name="Layout"/></office:master-styles>'
@@ -152,9 +157,9 @@ class DocumentConvertersIntegrationTest extends TestCase
 
     private function textImage(string $text): \Imagick
     {
-        $image = new \Imagick();
+        $image = new \Imagick;
         $image->newImage(1800, 300, 'white');
-        $draw = new \ImagickDraw();
+        $draw = new \ImagickDraw;
         $fonts = $image->queryFonts('*Sans*');
         $this->assertNotEmpty($fonts, 'Install a sans-serif font for converter fixtures.');
         $draw->setFont($fonts[0]);

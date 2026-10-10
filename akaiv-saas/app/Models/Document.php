@@ -7,13 +7,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -21,13 +21,13 @@ use Spatie\Tags\HasTags;
 
 class Document extends Model implements HasMedia
 {
-    use HasFactory;
-    use SoftDeletes;
     use BelongsToOrganization;
-    use Searchable;
-    use LogsActivity;
-    use InteractsWithMedia;
+    use HasFactory;
     use HasTags;
+    use InteractsWithMedia;
+    use LogsActivity;
+    use Searchable;
+    use SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -87,7 +87,7 @@ class Document extends Model implements HasMedia
             if (empty($document->uuid)) {
                 $document->uuid = (string) Str::uuid();
             }
-            if (empty($document->slug) && !empty($document->friendly_name)) {
+            if (empty($document->slug) && ! empty($document->friendly_name)) {
                 $document->slug = Str::slug($document->friendly_name);
             }
         });
@@ -190,7 +190,7 @@ class Document extends Model implements HasMedia
 
     public function activity(): MorphMany
     {
-        return $this->morphMany(config('activitylog.activity_model', \Spatie\Activitylog\Models\Activity::class), 'subject');
+        return $this->morphMany(config('activitylog.activity_model', Activity::class), 'subject');
     }
 
     public function incrementDownloadCount(): void
@@ -215,11 +215,12 @@ class Document extends Model implements HasMedia
             return true;
         }
         $activeOrg = session('active_organization_id');
-        if ($activeOrg === null || (int)$this->organization_id !== (int)$activeOrg) {
+        if ($activeOrg === null || (int) $this->organization_id !== (int) $activeOrg) {
             return false;
         }
+
         return $user->hasPermissionTo('document.view')
-            || (int)$this->owner_id === (int)$user->id
+            || (int) $this->owner_id === (int) $user->id
             || $user->hasPermissionTo('document.view_any');
     }
 

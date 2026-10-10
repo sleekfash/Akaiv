@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\PendingCommand;
 use Tests\TestCase;
 
 class MigrateLegacyDocumentsCommandTest extends TestCase
@@ -21,8 +22,11 @@ class MigrateLegacyDocumentsCommandTest extends TestCase
     use DatabaseMigrations;
 
     private string $root;
+
     private array $mapping;
+
     private Organization $organization;
+
     private User $owner;
 
     protected function setUp(): void
@@ -83,7 +87,7 @@ class MigrateLegacyDocumentsCommandTest extends TestCase
             'created_at' => '2021-01-23 23:28:26', 'updated_at' => '2021-01-24 10:00:00'], $changes);
     }
 
-    private function runImport(array $options = []): \Illuminate\Testing\PendingCommand
+    private function runImport(array $options = []): PendingCommand
     {
         file_put_contents($this->root.'/mapping.json', json_encode($this->mapping, JSON_THROW_ON_ERROR));
 

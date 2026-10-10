@@ -54,7 +54,7 @@ class DocumentTextExtractorTest extends TestCase
                     return "Pages: 3\n";
                 }
                 if ($command[0] === 'pdftotext') {
-                    return $command[2] === '2' ? '' : 'Native page '.$command[2];
+                    return $command[2] === '2' ? "\f\n" : 'Native page '.$command[2];
                 }
                 if ($command[0] === 'pdftoppm') {
                     $this->ocrPages[] = $command[2];
@@ -75,7 +75,7 @@ class DocumentTextExtractorTest extends TestCase
     public function test_word_uses_office_conversion_before_pdf_extraction(): void
     {
         $path = $this->directory.'/letter.docx';
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path, ZipArchive::CREATE);
         $zip->addFromString('word/document.xml', '<document>Fixture</document>');
         $zip->close();
@@ -103,7 +103,7 @@ class DocumentTextExtractorTest extends TestCase
     public function test_an_arbitrary_zip_cannot_masquerade_as_word(): void
     {
         $path = $this->directory.'/fake.docx';
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path, ZipArchive::CREATE);
         $zip->addFromString('unrelated.txt', 'Not a Word document');
         $zip->close();

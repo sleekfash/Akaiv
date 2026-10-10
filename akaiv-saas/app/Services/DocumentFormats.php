@@ -44,7 +44,7 @@ class DocumentFormats
             default => null,
         };
         if ($packageEntry !== null) {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($path) !== true) {
                 throw new InvalidArgumentException('Invalid or encrypted Office package.');
             }

@@ -66,13 +66,13 @@ class DocumentTextExtractor
         $text = [];
         for ($page = 1; $page <= $pages; $page++) {
             $pageText = $this->run(['pdftotext', '-f', (string) $page, '-l', (string) $page, '-layout', $input, '-']);
-            if (trim($pageText) === '') {
+            if (preg_match('/\S/u', $pageText) !== 1) {
                 $prefix = $directory.'/page';
                 $this->run(['pdftoppm', '-f', (string) $page, '-l', (string) $page, '-r', '150', '-png', '-singlefile', $input, $prefix]);
                 $pageText = $this->run(['tesseract', $prefix.'.png', 'stdout', '-l', 'eng']);
                 unlink($prefix.'.png');
             }
-            $text[] = trim($pageText);
+            $text[] = preg_replace('/^\s+|\s+$/u', '', $pageText);
         }
 
         return ['text' => implode("\n\n", $text), 'page_count' => $pages];
@@ -80,7 +80,7 @@ class DocumentTextExtractor
 
     private function images(string $input, string $directory): array
     {
-        $images = new \Imagick();
+        $images = new \Imagick;
         try {
             $images->readImage($input);
             $this->checkPageCount($images->getNumberImages());
