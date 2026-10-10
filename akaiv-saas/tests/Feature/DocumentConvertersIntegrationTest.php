@@ -68,6 +68,14 @@ class DocumentConvertersIntegrationTest extends TestCase
 
         $result = app(DocumentTextExtractor::class)->extract($path, $extension);
 
+        if ($extension === 'ods' && trim($result['text']) === '') {
+            $zip = new \ZipArchive;
+            $zip->open($path);
+            $details = $zip->getFromName('content.xml')."\n".$zip->getFromName('styles.xml');
+            $zip->close();
+            $this->fail('Generated spreadsheet rendered empty: '.$details);
+        }
+
         $this->assertStringContainsString('ARCHIVE VALIDATION DOCUMENT', preg_replace('/\s+/', ' ', $result['text']));
         $this->assertGreaterThanOrEqual(1, $result['page_count']);
     }
@@ -171,3 +179,4 @@ class DocumentConvertersIntegrationTest extends TestCase
         return $image;
     }
 }
+
