@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Document;
 use App\Services\DocumentProcessingVersion;
+use App\Services\DocumentThumbnailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,7 +13,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
-use Symfony\Component\Process\Process;
 
 class ThumbnailDocumentJob implements ShouldQueue
 {
@@ -41,8 +41,7 @@ class ThumbnailDocumentJob implements ShouldQueue
         $disk = Storage::disk($document->storage_disk);
         $committed = false;
         try {
-            $process = new Process(['pdftoppm', '-f', '1', '-l', '1', '-png', '-singlefile', '-scale-to', '1200', $input, $input]);
-            $process->setTimeout(240)->mustRun();
+            app(DocumentThumbnailer::class)->render($input);
             if (! $disk->put($thumbnail, file_get_contents($output), ['visibility' => 'private'])) {
                 throw new RuntimeException('Unable to store thumbnail.');
             }

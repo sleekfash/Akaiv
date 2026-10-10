@@ -34,7 +34,15 @@ class VirusScanDocumentJob implements ShouldQueue
     public function handle(): void
     {
         $current = $this->version->query()->first();
-        if (! $current || $current->status === 'deleted' || $current->virus_scanned) {
+        if (! $current || $current->status === 'deleted' || $current->virus_found) {
+            return;
+        }
+        if ($current->virus_scanned) {
+            if (DocumentProcessingVersion::clean($current)) {
+                OcrDocumentJob::dispatch($current)->afterCommit();
+                ThumbnailDocumentJob::dispatch($current)->delay(now()->addSeconds(5))->afterCommit();
+            }
+
             return;
         }
         if (! Storage::disk($current->storage_disk)->exists($current->storage_path)) {

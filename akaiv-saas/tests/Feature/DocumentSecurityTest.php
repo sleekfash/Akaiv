@@ -1,5 +1,7 @@
 <?php
 
+use App\Filament\Resources\DocumentResource\Pages\CreateDocument;
+use App\Filament\Resources\DocumentResource\Pages\EditDocument;
 use App\Jobs\IndexDocumentJob;
 use App\Jobs\OcrDocumentJob;
 use App\Jobs\ThumbnailDocumentJob;
@@ -9,7 +11,9 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Services\DocumentAntivirus;
 use App\Services\DocumentTextExtractor;
+use App\Services\DocumentThumbnailer;
 use App\Services\DocumentUploads;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
@@ -181,4 +185,72 @@ it('rolls back upload consumption when saving the document fails', function () {
     expect(fn () => $service->consume($path, $user, fn () => throw new RuntimeException('Save failed')))->toThrow(RuntimeException::class);
     expect(DB::table('document_uploads')->where('path', $path)->value('consumed_at'))->toBeNull();
     expect($service->consume($path, $user, fn ($attributes) => $attributes['storage_path']))->toBe($path);
+});
+
+it('discards and removes a thumbnail produced during file replacement', function () {
+    $document = securedDocument(['virus_scanned' => true, 'status' => 'published', 'file_extension' => 'pdf']);
+    $this->mock(DocumentThumbnailer::class)->shouldReceive('render')->once()->andReturnUsing(function ($input) use ($document) {
+        file_put_contents($input.'.png', 'Synthetic thumbnail');
+        $document->updateQuietly(['storage_path' => 'documents/new.pdf', 'virus_scanned' => false]);
+    });
+    (new ThumbnailDocumentJob($document))->handle();
+    expect($document->fresh()->metadata['thumbnail_path'] ?? null)->toBeNull()
+        ->and(Storage::disk('private')->allFiles('thumbnails'))->toBeEmpty();
+});
+
+it('recovers downstream dispatch when a successful scan job is retried', function () {
+    $document = securedDocument(['virus_scanned' => true, 'status' => 'published']);
+    $this->mock(DocumentAntivirus::class)->shouldNotReceive('scan');
+    (new VirusScanDocumentJob($document))->handle();
+    Bus::assertDispatched(OcrDocumentJob::class);
+    Bus::assertDispatched(ThumbnailDocumentJob::class);
+});
+
+it('rejects a claim under another organization even when the owner belongs to both', function () {
+    $user = uploadOwner();
+    $service = app(DocumentUploads::class);
+    $path = $service->store(UploadedFile::fake()->createWithContent('notes.txt', 'Owned text'), $user);
+    $other = Organization::create(['name' => 'Other', 'slug' => 'other', 'contact_email' => 'other@example.test']);
+    $user->organizations()->attach($other->id, ['role' => 'member']);
+    session(['active_organization_id' => $other->id]);
+    expect(fn () => $service->consume($path, $user, fn () => null))->toThrow(ValidationException::class);
+});
+
+it('enforces upload ownership through the create page and ignores forged processing fields', function () {
+    $user = uploadOwner();
+    $this->actingAs($user);
+    $path = app(DocumentUploads::class)->store(UploadedFile::fake()->createWithContent('notes.txt', 'Owned text'), $user);
+    $page = new class extends CreateDocument
+    {
+        public function saveForTest(array $data): Model
+        {
+            return $this->handleRecordCreation($data);
+        }
+    };
+    $record = $page->saveForTest(['friendly_name' => 'Owned', 'storage_path' => $path, 'status' => 'draft',
+        'virus_scanned' => true, 'organization_id' => 999, 'extracted_text' => 'Forged index', 'owner_id' => 999]);
+    expect($record->virus_scanned)->toBeFalse()->and($record->extracted_text)->toBeNull()
+        ->and((int) $record->owner_id)->toBe($user->id)
+        ->and((int) $record->organization_id)->toBe((int) session('active_organization_id'));
+    expect(fn () => $page->saveForTest(['friendly_name' => 'Forged', 'storage_path' => 'documents/forged.txt']))->toThrow(ValidationException::class);
+});
+
+it('enforces upload ownership through replacement and clears previous processing results', function () {
+    $user = uploadOwner();
+    $this->actingAs($user);
+    $document = securedDocument(['organization_id' => session('active_organization_id'), 'virus_scanned' => true,
+        'status' => 'published', 'ocr_completed' => true, 'extracted_text' => 'Old content']);
+    $page = new class extends EditDocument
+    {
+        public function saveForTest(Model $record, array $data): Model
+        {
+            return $this->handleRecordUpdate($record, $data);
+        }
+    };
+    expect(fn () => $page->saveForTest($document, ['storage_path' => 'documents/forged.txt']))->toThrow(ValidationException::class);
+    $path = app(DocumentUploads::class)->store(UploadedFile::fake()->createWithContent('replacement.txt', 'Replacement text'), $user);
+    $updated = $page->saveForTest($document, ['storage_path' => $path, 'status' => 'draft', 'virus_scanned' => true]);
+    expect($updated->virus_scanned)->toBeFalse()->and($updated->ocr_completed)->toBeFalse()
+        ->and($updated->extracted_text)->toBeNull()->and($updated->status)->toBe('uploading');
+    Bus::assertDispatched(VirusScanDocumentJob::class);
 });

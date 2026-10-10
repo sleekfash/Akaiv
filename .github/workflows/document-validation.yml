@@ -165,9 +165,16 @@ jobs:
           php-version: '8.3'
           extensions: mbstring, intl, pdo_pgsql, pdo_mysql, pdo_sqlite, bcmath, exif, pcntl, zip, gd, redis, sockets
           coverage: none
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.8'
+          cache: false
+      - name: Build pinned private storage server
+        run: GOBIN="$RUNNER_TEMP/akaiv-bin" go install github.com/minio/minio@RELEASE.2025-10-15T17-29-55Z
       - name: Start private storage and real antivirus
         run: |
-          docker run -d --name akaiv-test-storage -p 9000:9000 -e MINIO_ROOT_USER=akaiv-test -e MINIO_ROOT_PASSWORD=synthetic-storage-password quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z server /data
+          mkdir -p "$RUNNER_TEMP/akaiv-storage"
+          MINIO_ROOT_USER=akaiv-test MINIO_ROOT_PASSWORD=synthetic-storage-password "$RUNNER_TEMP/akaiv-bin/minio" server "$RUNNER_TEMP/akaiv-storage" --address 127.0.0.1:9000 > "$RUNNER_TEMP/akaiv-storage.log" 2>&1 &
           docker run -d --name akaiv-test-antivirus -p 3310:3310 clamav/clamav:stable
           for attempt in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:9000/minio/health/live && (echo PING | nc -w 2 127.0.0.1 3310 | grep -q PONG); then
@@ -175,7 +182,7 @@ jobs:
             fi
             sleep 5
           done
-          docker logs --tail=50 akaiv-test-antivirus
+          if docker inspect akaiv-test-antivirus >/dev/null 2>&1; then docker logs --tail=50 akaiv-test-antivirus; fi
           exit 1
       - name: Install locked dependencies
         run: |
@@ -187,5 +194,5 @@ jobs:
       - name: Service diagnostics on failure
         if: failure()
         run: |
-          docker logs --tail=50 akaiv-test-antivirus
+          if docker inspect akaiv-test-antivirus >/dev/null 2>&1; then docker logs --tail=50 akaiv-test-antivirus; fi
           test ! -f storage/logs/laravel.log || tail -100 storage/logs/laravel.log

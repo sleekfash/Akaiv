@@ -26,6 +26,9 @@ class DocumentUploads
     public function store(UploadedFile $file, User $user): string
     {
         $organization = $this->organization($user);
+        if ($file->getSize() > 268435456 || $file->getSize() === 0) {
+            throw ValidationException::withMessages(['data.storage_path' => 'Choose a nonempty file no larger than 256 MB.']);
+        }
         $path = 'documents/'.$organization.'/'.$user->id.'/'.Str::uuid().'.'.strtolower($file->getClientOriginalExtension());
         $stream = fopen($file->getRealPath(), 'rb');
         try {
