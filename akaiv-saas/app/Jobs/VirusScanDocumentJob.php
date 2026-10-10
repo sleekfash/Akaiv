@@ -82,8 +82,7 @@ class VirusScanDocumentJob implements ShouldQueue
             'status' => $this->document->status === 'uploading' ? 'published' : $this->document->status,
         ]);
 
-        OcrDocumentJob::dispatch($this->document)->delay(now()->addSeconds(3));
+        OcrDocumentJob::dispatch($this->document);
         ThumbnailDocumentJob::dispatch($this->document)->delay(now()->addSeconds(5));
-        IndexDocumentJob::dispatch($this->document)->delay(now()->addSeconds(10));
     }
 }

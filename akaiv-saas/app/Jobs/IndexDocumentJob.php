@@ -21,11 +21,14 @@ class IndexDocumentJob implements ShouldQueue
 
     public function handle(): void
     {
-        if ($this->document->status === 'deleted') {
+        $fresh = Document::where('organization_id', $this->document->organization_id)
+            ->whereKey($this->document->id)->first();
+
+        if (! $fresh || ! $fresh->shouldBeSearchable()) {
             $this->document->unsearchable();
             return;
         }
 
-        $this->document->searchable();
+        $fresh->searchable();
     }
 }

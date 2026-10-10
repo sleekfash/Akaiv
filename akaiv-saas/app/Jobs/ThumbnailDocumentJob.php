@@ -23,6 +23,14 @@ class ThumbnailDocumentJob implements ShouldQueue
 
     public function handle(): void
     {
+        $fresh = Document::where('organization_id', $this->document->organization_id)
+            ->whereKey($this->document->id)->first();
+        if (! $fresh || ! $fresh->virus_scanned || $fresh->virus_found
+            || in_array($fresh->status, ['deleted', 'quarantined'], true)) {
+            return;
+        }
+        $this->document = $fresh;
+
         if (strtolower((string) $this->document->file_extension) !== 'pdf') {
             return;
         }

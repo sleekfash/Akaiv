@@ -1,0 +1,94 @@
+name: Document migration and converters
+
+on:
+  push:
+    branches: ['codex/document-validation-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  documents:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, pgsql]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: akaiv_test
+          POSTGRES_USER: akaiv_test
+          POSTGRES_PASSWORD: disposable-test-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U akaiv_test -d akaiv_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    defaults:
+      run:
+        working-directory: akaiv-saas
+        shell: bash
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://localhost
+      DB_CONNECTION: ${{ matrix.database }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: ${{ matrix.database == 'pgsql' && 'akaiv_test' || ':memory:' }}
+      DB_USERNAME: akaiv_test
+      DB_PASSWORD: disposable-test-password
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      SCOUT_DRIVER: collection
+      FILESYSTEM_DISK: local
+      DOCUMENT_AGENT_URL: http://127.0.0.1:9
+      DOCUMENT_AGENT_SECRET: synthetic-test-only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: akaiv-saas
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_pgsql, pdo_mysql, pdo_sqlite, bcmath, exif, pcntl, zip, gd, redis, sockets, imagick
+          coverage: none
+      - name: Install real document converters
+        if: matrix.database == 'sqlite'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress tesseract-ocr tesseract-ocr-eng poppler-utils fonts-dejavu-core
+      - name: Install locked dependencies
+        id: dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Focused migration and isolation tests
+        run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|TenantIsolationTest'
+      - name: Full application tests
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: vendor/bin/pest --colors=never
+      - name: Real Office, PDF and image converter tests
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' && matrix.database == 'sqlite' }}
+        env:
+          AKAIV_RUN_CONVERTERS: '1'
+        run: vendor/bin/pest --colors=never --filter=DocumentConvertersIntegrationTest
+      - name: Check changed PHP formatting
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' && matrix.database == 'sqlite' }}
+        run: >-
+          vendor/bin/pint --test
+          app/Console/Commands/MigrateLegacyDocumentsCommand.php
+          app/Filament/Resources/DocumentResource.php
+          app/Filament/Resources/DocumentResource/Pages/CreateDocument.php
+          app/Filament/Resources/DocumentResource/Pages/EditDocument.php
+          app/Jobs/IndexDocumentJob.php app/Jobs/OcrDocumentJob.php
+          app/Jobs/ThumbnailDocumentJob.php app/Jobs/VirusScanDocumentJob.php
+          app/Models/Document.php app/Observers/DocumentObserver.php app/Services
+          database/migrations/2026_10_08_000001_create_legacy_document_imports_table.php
+          tests/Feature/MigrateLegacyDocumentsCommandTest.php
+          tests/Feature/DocumentPipelineTest.php tests/Feature/DocumentConvertersIntegrationTest.php
+          tests/Unit/DocumentTextExtractorTest.php

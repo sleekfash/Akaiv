@@ -131,8 +131,16 @@ class Document extends Model implements HasMedia
 
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
-        return $query->where('status', '!=', 'deleted')
+        return $query->where('status', 'published')
+            ->where('virus_scanned', true)
+            ->where('virus_found', false)
             ->whereNotNull('organization_id');
+    }
+
+    public function shouldBeSearchable(): bool
+    {
+        return $this->organization_id !== null && $this->status === 'published'
+            && $this->virus_scanned && ! $this->virus_found && ! $this->trashed();
     }
 
     public function workspace(): BelongsTo

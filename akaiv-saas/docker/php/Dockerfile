@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     freetype-dev \
     libpq-dev \
+    sqlite-dev \
     libxml2-dev \
     oniguruma-dev \
     icu-dev \
@@ -42,6 +43,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         opcache \
         pcntl \
         pdo_pgsql \
+        pdo_mysql \
+        pdo_sqlite \
         pgsql \
         soap \
         zip \

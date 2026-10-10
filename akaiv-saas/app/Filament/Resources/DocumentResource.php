@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DocumentResource\Pages;
 use App\Models\Document;
+use App\Services\DocumentFormats;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Section;
@@ -20,6 +21,8 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class DocumentResource extends Resource
 {
@@ -34,7 +37,7 @@ class DocumentResource extends Resource
         return $form->schema([
             Section::make('Document metadata')->schema([
                 TextInput::make('friendly_name')->label('Document name')->required()->maxLength(500),
-                TextInput::make('original_filename')->label('Original filename')->required()->maxLength(500),
+                TextInput::make('original_filename')->label('Original filename')->readOnly()->maxLength(500),
                 TextInput::make('folio_number')->label('Folio number')->maxLength(200),
                 Textarea::make('description')->label('Description')->helperText('Add the context needed to identify this document.')->columnSpanFull(),
                 Select::make('status')->options([
@@ -51,14 +54,11 @@ class DocumentResource extends Resource
                     ->disk('s3')
                     ->directory('documents')
                     ->visibility('private')
+                    ->storeFileNamesIn('original_filename')
+                    ->getUploadedFileNameForStorageUsing(fn (TemporaryUploadedFile $file): string => Str::uuid().'.'.strtolower($file->getClientOriginalExtension()))
                     ->required(fn (string $operation): bool => $operation === 'create')
-                    ->acceptedFileTypes([
-                        'application/pdf',
-                        'text/plain',
-                        'text/csv',
-                        'application/msword',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    ])
+                    ->acceptedFileTypes(DocumentFormats::acceptedMimeTypes())
+                    ->helperText('PDF, Word, Excel, PowerPoint, OpenDocument, text, RTF, and common image formats. Files are scanned before access.')
                     ->maxSize(262144)
                     ->columnSpanFull(),
             ]),
