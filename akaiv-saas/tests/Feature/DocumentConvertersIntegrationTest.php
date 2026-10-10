@@ -50,31 +50,20 @@ class DocumentConvertersIntegrationTest extends TestCase
     #[DataProvider('officeFormats')]
     public function test_real_office_and_pdf_extraction(string $family, string $extension): void
     {
-        $sourceExtension = ['text' => 'fodt', 'spreadsheet' => 'fods', 'presentation' => 'fodp'][$family];
+        $sourceExtension = ['text' => 'fodt', 'spreadsheet' => 'csv', 'presentation' => 'fodp'][$family];
         $source = $this->directory.'/fixture.'.$sourceExtension;
         $body = match ($family) {
             'text' => '<office:text><text:p>ARCHIVE VALIDATION DOCUMENT</text:p></office:text>',
-            'spreadsheet' => '<office:spreadsheet><table:table table:name="Records" table:style-name="Sheet">'
-                .'<table:table-column table:style-name="Column"/><table:table-row>'
-                .'<table:table-cell office:value-type="string"><text:p>ARCHIVE VALIDATION DOCUMENT</text:p>'
-                .'</table:table-cell></table:table-row></table:table></office:spreadsheet>',
+            'spreadsheet' => "ARCHIVE VALIDATION DOCUMENT\n",
             'presentation' => '<office:presentation><draw:page draw:name="Slide1" draw:master-page-name="Default">'
                 .'<draw:frame svg:x="1cm" svg:y="1cm" svg:width="20cm" svg:height="5cm">'
                 .'<draw:text-box><text:p>ARCHIVE VALIDATION DOCUMENT</text:p></draw:text-box>'
                 .'</draw:frame></draw:page></office:presentation>',
         };
-        file_put_contents($source, $this->flatDocument($family, $body));
+        file_put_contents($source, $family === 'spreadsheet' ? $body : $this->flatDocument($family, $body));
         $path = $this->convert($source, $extension);
 
         $result = app(DocumentTextExtractor::class)->extract($path, $extension);
-
-        if ($extension === 'ods' && trim($result['text']) === '') {
-            $zip = new \ZipArchive;
-            $zip->open($path);
-            $details = $zip->getFromName('content.xml')."\n".$zip->getFromName('styles.xml');
-            $zip->close();
-            $this->fail('Generated spreadsheet rendered empty: '.$details);
-        }
 
         $this->assertStringContainsString('ARCHIVE VALIDATION DOCUMENT', preg_replace('/\s+/', ' ', $result['text']));
         $this->assertGreaterThanOrEqual(1, $result['page_count']);
@@ -140,10 +129,6 @@ class DocumentConvertersIntegrationTest extends TestCase
             .'office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.'.$family.'">'
             .'<office:automatic-styles><style:style style:name="NewPage" style:family="paragraph">'
             .'<style:paragraph-properties fo:break-before="page"/></style:style>'
-            .'<style:style style:name="Sheet" style:family="table" style:master-page-name="Default">'
-            .'<style:table-properties table:display="true"/></style:style>'
-            .'<style:style style:name="Column" style:family="table-column">'
-            .'<style:table-column-properties style:column-width="20cm"/></style:style>'
             .'<style:page-layout style:name="Layout"><style:page-layout-properties fo:page-width="28cm" '
             .'fo:page-height="21cm" style:print-orientation="landscape"/></style:page-layout></office:automatic-styles>'
             .'<office:master-styles><style:master-page style:name="Default" style:page-layout-name="Layout"/></office:master-styles>'
