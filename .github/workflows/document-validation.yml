@@ -68,6 +68,7 @@ jobs:
         id: dependencies
         run: |
           mkdir -p bootstrap/cache storage/framework/{cache/data,sessions,views} storage/logs
+          touch .env
           composer install --no-interaction --prefer-dist --no-progress
       - name: Focused migration and isolation tests
         run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|TenantIsolationTest'
@@ -94,4 +95,3 @@ jobs:
           tests/Feature/MigrateLegacyDocumentsCommandTest.php
           tests/Feature/DocumentPipelineTest.php tests/Feature/DocumentConvertersIntegrationTest.php
           tests/Unit/DocumentTextExtractorTest.php
-
