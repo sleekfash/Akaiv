@@ -14,6 +14,10 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+beforeEach(function (): void {
+    Bus::fake();
+});
+
 function pipelineDocument(array $attributes = []): Document
 {
     $organization = Organization::create([

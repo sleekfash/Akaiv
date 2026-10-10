@@ -1,6 +1,5 @@
 <?php
 
-use App\Jobs\VirusScanDocumentJob;
 use App\Models\Document;
 use App\Models\Organization;
 use App\Services\DocumentAntivirus;
@@ -34,12 +33,11 @@ it('runs clean and infected documents through real storage antivirus queues and 
     foreach (['clean' => 'AkaivServiceSentinel verified archive text', 'infected' => $infected] as $kind => $content) {
         $path = 'service-tests/'.Str::uuid().'.txt';
         expect($disk->put($path, $content, ['visibility' => 'private']))->toBeTrue();
-        $documents[$kind] = Document::withoutEvents(fn () => Document::create([
+        $documents[$kind] = Document::create([
             'organization_id' => $org->id, 'friendly_name' => 'Service '.$kind, 'original_filename' => $kind.'.txt',
             'storage_disk' => 's3', 'storage_path' => $path, 'file_extension' => 'txt', 'mime_type' => 'text/plain',
             'sha256_checksum' => hash('sha256', $content), 'status' => 'uploading', 'ocr_required' => true,
-        ]));
-        VirusScanDocumentJob::dispatch($documents[$kind]);
+        ]);
     }
     expect(Queue::connection('redis')->size())->toBe(2);
     $deadline = microtime(true) + 90;
@@ -70,7 +68,7 @@ it('runs clean and infected documents through real storage antivirus queues and 
     } while (microtime(true) < $deadline);
     expect($hits)->toHaveCount(1)->and((int) $hits[0]['id'])->toBe($clean->id)
         ->and((int) $hits[0]['organization_id'])->toBe($org->id);
-    expect($index->search('Service infected')->getHits())->toBeEmpty();
+    expect($index->search('')->getHits())->toHaveCount(1);
     $unsigned = rtrim(config('filesystems.disks.s3.endpoint'), '/').'/'.config('filesystems.disks.s3.bucket').'/'.$clean->storage_path;
     expect(Http::get($unsigned)->status())->toBeIn([401, 403]);
     expect(Http::get($disk->temporaryUrl($clean->storage_path, now()->addMinute()))->body())->toBe($clean->extracted_text);
