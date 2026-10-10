@@ -39,7 +39,7 @@ it('quarantines a document whose file is missing from storage', function (): voi
     Storage::fake('private');
     $document = pipelineDocument();
 
-    expect(fn () => (new VirusScanDocumentJob($document))->handle())->toThrow(RuntimeException::class);
+    (new VirusScanDocumentJob($document))->handle();
 
     expect($document->fresh()->status)->toBe('quarantined')
         ->and($document->fresh()->virus_scanned)->toBeFalse();
@@ -47,7 +47,7 @@ it('quarantines a document whose file is missing from storage', function (): voi
 
 it('skips OCR when it has already completed', function (): void {
     Storage::fake('private');
-    $document = pipelineDocument(['ocr_required' => true, 'ocr_completed' => true]);
+    $document = pipelineDocument(['virus_scanned' => true, 'status' => 'published', 'ocr_required' => true, 'ocr_completed' => true]);
 
     (new OcrDocumentJob($document))->handle(app(DocumentTextExtractor::class));
 
@@ -56,7 +56,7 @@ it('skips OCR when it has already completed', function (): void {
 
 it('skips thumbnail generation for non-pdf documents', function (): void {
     Storage::fake('private');
-    $document = pipelineDocument(['file_extension' => 'txt', 'mime_type' => 'text/plain']);
+    $document = pipelineDocument(['virus_scanned' => true, 'status' => 'published', 'file_extension' => 'txt', 'mime_type' => 'text/plain']);
 
     (new ThumbnailDocumentJob($document))->handle();
 

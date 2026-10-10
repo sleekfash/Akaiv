@@ -27,7 +27,7 @@ it('runs clean and infected documents through real storage antivirus queues and 
     expect(config('scout.driver'))->toBe('meilisearch');
     $disk = Storage::disk('s3');
     $disk->getClient()->createBucket(['Bucket' => config('filesystems.disks.s3.bucket')]);
-    $org = Organization::create(['name' => 'Service integration', 'slug' => 'service-integration']);
+    $org = Organization::create(['contact_email' => 'services@example.test', 'name' => 'Service integration', 'slug' => 'service-integration']);
     $documents = [];
     // EICAR is a harmless industry-standard antivirus test string, assembled only in disposable CI.
     $infected = 'X5O!P%@AP[4'.'\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';

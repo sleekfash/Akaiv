@@ -167,7 +167,7 @@ jobs:
           coverage: none
       - name: Start private storage and real antivirus
         run: |
-          docker run -d --name akaiv-test-storage -p 9000:9000 -e MINIO_ROOT_USER=akaiv-test -e MINIO_ROOT_PASSWORD=synthetic-storage-password minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          docker run -d --name akaiv-test-storage -p 9000:9000 -e MINIO_ROOT_USER=akaiv-test -e MINIO_ROOT_PASSWORD=synthetic-storage-password quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z server /data
           docker run -d --name akaiv-test-antivirus -p 3310:3310 clamav/clamav:stable
           for attempt in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:9000/minio/health/live && (echo PING | nc -w 2 127.0.0.1 3310 | grep -q PONG); then

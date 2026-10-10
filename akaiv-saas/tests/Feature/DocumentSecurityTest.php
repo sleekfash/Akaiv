@@ -28,7 +28,7 @@ beforeEach(function () {
 
 function securedDocument(array $attributes = []): Document
 {
-    $org = Organization::create(['name' => 'Security', 'slug' => 'security-'.uniqid()]);
+    $org = Organization::create(['contact_email' => 'services@example.test', 'name' => 'Security', 'slug' => 'security-'.uniqid()]);
     $content = 'Verified archive document';
     $document = Document::create(array_merge([
         'organization_id' => $org->id, 'friendly_name' => 'Security test', 'original_filename' => 'test.txt',
@@ -122,7 +122,7 @@ it('skips a stale thumbnail before reading any file', function () {
 
 function uploadOwner(): User
 {
-    $org = Organization::create(['name' => 'Uploads', 'slug' => 'uploads-'.uniqid()]);
+    $org = Organization::create(['contact_email' => 'services@example.test', 'name' => 'Uploads', 'slug' => 'uploads-'.uniqid()]);
     $user = User::create(['name' => 'Uploader', 'email' => uniqid().'@example.test', 'password' => 'test-password']);
     $user->organizations()->attach($org->id, ['role' => 'member']);
     session(['active_organization_id' => $org->id]);

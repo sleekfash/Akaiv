@@ -29,7 +29,13 @@ class DocumentAntivirus
             return ['verdict' => 'clean'];
         } finally {
             fclose($stream);
-            $socket?->close();
+            try {
+                $socket?->close();
+            } catch (\Error $error) {
+                if (! str_contains($error->getMessage(), 'already been closed')) {
+                    throw $error;
+                }
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -34,6 +35,15 @@ class VirusScanDocumentJob implements ShouldQueue
     {
         $current = $this->version->query()->first();
         if (! $current || $current->status === 'deleted' || $current->virus_scanned) {
+            return;
+        }
+        if (! Storage::disk($current->storage_disk)->exists($current->storage_path)) {
+            $this->version->apply(function (Document $document) {
+                if (! $document->virus_scanned) {
+                    $document->updateQuietly(['status' => 'quarantined', 'virus_scanned' => false]);
+                }
+            });
+
             return;
         }
         $input = null;
