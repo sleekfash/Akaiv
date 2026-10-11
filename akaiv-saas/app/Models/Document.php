@@ -137,6 +137,12 @@ class Document extends Model implements HasMedia
             ->whereNotNull('organization_id');
     }
 
+    public function isContentAccessible(): bool
+    {
+        return ! $this->trashed() && $this->virus_scanned && ! $this->virus_found
+            && in_array($this->status, ['published', 'draft', 'archived'], true);
+    }
+
     public function shouldBeSearchable(): bool
     {
         return $this->organization_id !== null && $this->status === 'published'

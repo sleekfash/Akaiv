@@ -47,7 +47,7 @@ class ShareController extends Controller
     private function serve(Request $request, Share $share): StreamedResponse
     {
         $document = $share->document;
-        abort_if($document === null, 404);
+        abort_unless($document?->isContentAccessible(), 404);
 
         $disk = Storage::disk($document->storage_disk);
         abort_unless($disk->exists($document->storage_path), 404);

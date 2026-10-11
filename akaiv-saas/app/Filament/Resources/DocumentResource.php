@@ -100,7 +100,7 @@ class DocumentResource extends Resource
                         ['document' => $record->uuid],
                     ))
                     ->openUrlInNewTab()
-                    ->visible(fn (Document $record): bool => $record->virus_scanned && ! $record->virus_found && $record->status !== 'deleted'),
+                    ->visible(fn (Document $record): bool => $record->isContentAccessible()),
                 EditAction::make(),
                 DeleteAction::make()
                     ->label('Move to trash')

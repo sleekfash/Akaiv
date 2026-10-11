@@ -13,6 +13,7 @@ class DocumentAgentController extends Controller
     public function analyze(Request $request, Document $document): JsonResponse
     {
         $this->authorize('view', $document);
+        abort_unless($document->isContentAccessible(), 404);
 
         $endpoint = config('services.document_agent.url');
         $secret = config('services.document_agent.secret');

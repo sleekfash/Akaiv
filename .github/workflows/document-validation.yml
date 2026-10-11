@@ -71,7 +71,7 @@ jobs:
           touch .env
           composer install --no-interaction --prefer-dist --no-progress
       - name: Focused migration and isolation tests
-        run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|DocumentSecurityTest|TenantIsolationTest'
+        run: vendor/bin/pest --colors=never --filter='MigrateLegacyDocumentsCommandTest|DocumentTextExtractorTest|DocumentPipelineTest|DocumentSecurityTest|DocumentContentAccessTest|TenantIsolationTest'
       - name: Full application tests
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: vendor/bin/pest --colors=never
@@ -98,6 +98,9 @@ jobs:
           tests/Feature/DocumentSecurityTest.php tests/Feature/DocumentServicesIntegrationTest.php
           database/migrations/2026_10_10_000001_create_document_uploads_table.php
           config/services.php config/queue.php
+          app/Http/Controllers/PreviewDocumentController.php app/Http/Controllers/DownloadDocumentController.php
+          app/Http/Controllers/ShareController.php app/Http/Controllers/DocumentAgentController.php
+          tests/Feature/DocumentContentAccessTest.php
           database/migrations/2026_10_11_000001_create_failed_jobs_table.php
 
   real-services:
