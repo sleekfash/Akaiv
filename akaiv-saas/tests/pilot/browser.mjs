@@ -90,6 +90,9 @@ try {
   console.log(`Browser pilot passed: ${checks} checks; no JavaScript page errors.`);
 } catch (error) {
   console.error(`Browser pilot stopped after ${checks} checks.`);
-  if (lastPage && !lastPage.isClosed()) console.error((await lastPage.locator('body').innerText()).slice(0,6000));
+  if (lastPage && !lastPage.isClosed()) {
+    console.error((await lastPage.locator('body').innerText()).slice(0,6000));
+    console.error(await lastPage.evaluate(() => ({width: innerWidth, sheets: [...document.styleSheets].map(s => s.href), sidebar: [...document.querySelectorAll('.fi-sidebar,.fi-main-ctn')].map(el => ({class: el.className, position: getComputedStyle(el).position, display: getComputedStyle(el).display, box: el.getBoundingClientRect().toJSON()}))})));
+  }
   throw error;
 } finally { await browser.close(); }
