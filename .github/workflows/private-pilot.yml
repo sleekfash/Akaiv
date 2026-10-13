@@ -1,0 +1,121 @@
+name: Private pilot validation
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: akaiv-saas
+        shell: bash
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8000
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: akaiv_pilot_test
+      DB_USERNAME: akaiv
+      DB_PASSWORD: synthetic-pilot-password
+      SESSION_DRIVER: file
+      CACHE_STORE: array
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: log
+      PILOT_TEST_MODE: '1'
+      PILOT_RESULT_FILE: /tmp/akaiv-pilot-fixture.json
+      PILOT_CHECKPOINT_FILE: /tmp/akaiv-pilot-checkpoint.json
+      PILOT_RECOVERY_MANIFEST: /tmp/akaiv-pilot-recovery.json
+      CLAMAV_HOST: 127.0.0.1
+      AWS_ENDPOINT: http://127.0.0.1:9000
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: synthetic-pilot
+      AWS_ACCESS_KEY_ID: synthetic-pilot
+      AWS_SECRET_ACCESS_KEY: synthetic-pilot-storage-password
+      AWS_USE_PATH_STYLE_ENDPOINT: 'true'
+      PGHOST: 127.0.0.1
+      PGUSER: akaiv
+      PGPASSWORD: synthetic-pilot-password
+      PGDATABASE: akaiv_pilot_test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: akaiv_pilot_test
+          POSTGRES_USER: akaiv
+          POSTGRES_PASSWORD: synthetic-pilot-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U akaiv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_pgsql, bcmath, exif, pcntl, zip, gd
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install and build
+        run: |
+          mkdir -p storage/framework/{cache,sessions,views} storage/logs
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci --no-audit --no-fund
+          npm run build
+          npx playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y rclone postgresql-client-16
+      - name: Start isolated antivirus and private storage
+        run: |
+          docker run -d --name pilot-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" minio/minio:latest server /data
+          docker run -d --name pilot-clam -p 127.0.0.1:3310:3310 clamav/clamav:stable
+          for attempt in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null && php -r '$s=@fsockopen("127.0.0.1",3310,$e,$m,1);if(!$s)exit(1);fwrite($s,"zPING\0");exit(str_starts_with(fread($s,10),"PONG")?0:1);'; then exit 0; fi
+            sleep 5
+          done
+          docker logs --tail 30 pilot-clam
+          exit 1
+      - name: Synthetic records and real infrastructure checks
+        run: |
+          php artisan migrate --force
+          php tests/pilot/seed.php
+          php tests/pilot/infrastructure.php
+          pids=()
+          for writer in 1 2 3 4; do php tests/pilot/audit-writer.php & pids+=("$!"); done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          php artisan archive:audit-verify --checkpoint="$PILOT_CHECKPOINT_FILE"
+      - name: Browser authentication and case workflows
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 >/tmp/akaiv-pilot-server.log 2>&1 &
+          for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:8000/admin/login >/dev/null; then break; fi; sleep 1; done
+          node tests/pilot/browser.mjs
+      - name: Isolated database and object recovery
+        env:
+          ARCHIVE_DATABASE_CONTAINER: ${{ job.services.postgres.id }}
+          ARCHIVE_OBJECT_REMOTE: pilot:synthetic-pilot
+          RCLONE_CONFIG_PILOT_TYPE: s3
+          RCLONE_CONFIG_PILOT_PROVIDER: Minio
+          RCLONE_CONFIG_PILOT_ACCESS_KEY_ID: synthetic-pilot
+          RCLONE_CONFIG_PILOT_SECRET_ACCESS_KEY: synthetic-pilot-storage-password
+          RCLONE_CONFIG_PILOT_ENDPOINT: http://127.0.0.1:9000
+          RCLONE_CONFIG_PILOT_REGION: us-east-1
+          RESTORE_OBJECT_DIR: /tmp/akaiv-restored-objects
+        run: |
+          php tests/pilot/recovery-manifest.php create
+          bash scripts/backup-archive.sh /tmp/akaiv-pilot-backup
+          createdb akaiv_restore_test
+          PGDATABASE=akaiv_restore_test bash scripts/restore-archive-isolated.sh /tmp/akaiv-pilot-backup
+          DB_DATABASE=akaiv_restore_test php tests/pilot/recovery-manifest.php verify
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          test ! -f /tmp/akaiv-pilot-server.log || tail -40 /tmp/akaiv-pilot-server.log
+          docker logs --tail 30 pilot-clam || true

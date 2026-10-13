@@ -5,7 +5,11 @@ umask 077
 destination=${1:?Provide a new backup directory}
 test ! -e "$destination" || { echo 'Refusing to overwrite an existing backup' >&2; exit 1; }
 mkdir -p "$destination/objects"
-docker compose -f docker-compose.production.yml exec -T pgsql sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$destination/database.dump"
+if [[ -n "${ARCHIVE_DATABASE_CONTAINER:-}" ]]; then
+  docker exec "$ARCHIVE_DATABASE_CONTAINER" pg_dump -Fc -U "${PGUSER:?}" "${PGDATABASE:?}" > "$destination/database.dump"
+else
+  docker compose -f docker-compose.production.yml exec -T pgsql sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$destination/database.dump"
+fi
 # Immutable object keys and no object garbage collection are required during this copy.
 rclone copy "$ARCHIVE_OBJECT_REMOTE" "$destination/objects" --checksum
 sha256sum "$destination/database.dump" | cut -d " " -f 1 > "$destination/database.sha256"

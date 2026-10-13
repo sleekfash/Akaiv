@@ -13,7 +13,10 @@ trait BelongsToOrganization
     {
         static::addGlobalScope(new OrganizationScope);
 
-        static::creating(function ($model) {
+        static::saving(function ($model) {
+            if ($model->exists) {
+                return;
+            }
             if ($model->isFillable('created_by') && auth()->check()) {
                 $model->created_by = auth()->id();
             }

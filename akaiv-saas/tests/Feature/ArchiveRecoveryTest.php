@@ -54,3 +54,9 @@ it('antivirus success never publishes and infected bytes remain blocked', functi
     expect($doc->fresh()->status)->toBe('draft')->and($doc->fresh()->scan_state)->toBe('clean');
     Queue::assertNotPushed(OcrDocumentJob::class);
 });
+
+it('derives the proceedings tenant before validating a manually entered new session', function () {
+    [$org,$actor,$case] = archiveContext($this);
+    $record = CaseProceeding::create(['case_id' => $case->id, 'session_date' => '2026-10-13', 'presiding_judge' => 'Synthetic Judge']);
+    expect((int) $record->organization_id)->toBe($org->id)->and((int) $record->created_by)->toBe($actor->id);
+});
