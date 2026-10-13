@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "${APP_ENV:-}" == testing && "${PILOT_TEST_MODE:-}" == 1 && "${DB_DATABASE:-}" == *_pilot_test ]] || { echo 'Disposable pilot environment required' >&2; exit 1; }
+[[ "${APP_ENV:-}" == pilot && "${PILOT_TEST_MODE:-}" == 1 && "${DB_DATABASE:-}" == *_pilot_test ]] || { echo 'Disposable pilot environment required' >&2; exit 1; }
 pilot_user=$(id -un)
 pilot_group=$(id -gn)
 cat > /tmp/akaiv-pilot-fpm.conf <<FPM

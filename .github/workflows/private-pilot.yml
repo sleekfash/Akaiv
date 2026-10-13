@@ -14,7 +14,7 @@ jobs:
         working-directory: akaiv-saas
         shell: bash
     env:
-      APP_ENV: testing
+      APP_ENV: pilot
       APP_DEBUG: 'false'
       APP_URL: http://127.0.0.1:8000
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

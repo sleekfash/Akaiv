@@ -11,6 +11,6 @@ set_exception_handler(static function (Throwable $error): void {
     exit(1);
 });
 $database = (string) config('database.connections.'.config('database.default').'.database');
-if (! app()->environment('testing') || getenv('PILOT_TEST_MODE') !== '1' || ! (str_ends_with($database, '_pilot_test') || str_ends_with($database, '_restore_test') || str_ends_with($database, 'akaiv-pilot.sqlite'))) {
+if (! app()->environment(['testing', 'pilot']) || getenv('PILOT_TEST_MODE') !== '1' || ! (str_ends_with($database, '_pilot_test') || str_ends_with($database, '_restore_test') || str_ends_with($database, 'akaiv-pilot.sqlite'))) {
     throw new RuntimeException('Pilot scripts require an explicitly opted-in disposable test database.');
 }
