@@ -14,6 +14,18 @@ async function login(name, viewport) {
   const page = await context.newPage();
   lastPage = page;
   page.on('pageerror', error => errors.push(error.message));
+  page.on('response', async response => {
+    if (new URL(response.url()).pathname !== '/livewire/update' || response.status() !== 200) return;
+    try {
+      const result = await response.json();
+      const request = response.request().postDataJSON();
+      console.log('Livewire exchange:', JSON.stringify({
+        methods: (request.components || []).flatMap(c => (c.calls || []).map(x => x.method)),
+        events: (result.components || []).flatMap(c => (c.effects?.dispatches || []).map(e => ({name:e.name, field:e.params?.name, origin:e.params?.payload?.url ? new URL(e.params.payload.url).origin : null})))
+      }));
+    } catch {}
+  });
+  page.on('request', request => { if (new URL(request.url()).port === '9000') console.log('Object request:', request.method(), new URL(request.url()).pathname); });
   page.on('console', message => { if(message.type()==='error') console.error('Browser console:', message.text()); });
   page.on('requestfailed', request => console.error('Request failed:', request.method(), new URL(request.url()).origin+new URL(request.url()).pathname, request.failure()?.errorText));
   page.on('response', response => { if(response.status()>=400) console.error('HTTP error:', response.status(), new URL(response.url()).pathname); });
