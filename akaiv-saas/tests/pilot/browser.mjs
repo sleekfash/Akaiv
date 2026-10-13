@@ -14,6 +14,9 @@ async function login(name, viewport) {
   const page = await context.newPage();
   lastPage = page;
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if(message.type()==='error') console.error('Browser console:', message.text()); });
+  page.on('requestfailed', request => console.error('Request failed:', request.method(), new URL(request.url()).origin+new URL(request.url()).pathname, request.failure()?.errorText));
+  page.on('response', response => { if(response.status()>=400) console.error('HTTP error:', response.status(), new URL(response.url()).pathname); });
   await page.goto(`${base}/admin/login`);
   await page.getByLabel('Email address').fill(`${name}@example.test`);
   await page.locator('input[id="data.password"]').fill('Synthetic-Pilot-2026!');
