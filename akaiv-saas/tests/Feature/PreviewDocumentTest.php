@@ -88,3 +88,10 @@ it('rejects an invalid preview signature', function (): void {
 
     $response->assertForbidden();
 });
+
+it('redirects a guest with a valid signed preview to the panel login', function () {
+    $organization = Organization::create(['name' => 'Guest Court', 'slug' => 'guest-court', 'contact_email' => 'guest@example.test']);
+    $user = User::create(['name' => 'Synthetic owner', 'email' => 'guest-owner@example.test', 'password' => 'test-secret']);
+    $document = Document::create(['organization_id' => $organization->id, 'owner_id' => $user->id, 'friendly_name' => 'Private guest fixture', 'original_filename' => 'guest.txt', 'storage_disk' => 'private', 'storage_path' => 'guest.txt', 'status' => 'draft']);
+    $this->get(URL::temporarySignedRoute('documents.preview', now()->addMinute(), ['document' => $document->uuid]))->assertRedirect(route('filament.admin.auth.login'));
+});

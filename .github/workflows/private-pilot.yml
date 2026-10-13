@@ -25,6 +25,7 @@ jobs:
       DB_USERNAME: akaiv
       DB_PASSWORD: synthetic-pilot-password
       SESSION_DRIVER: file
+      SESSION_SECURE_COOKIE: 'false'
       CACHE_STORE: array
       QUEUE_CONNECTION: redis
       REDIS_HOST: 127.0.0.1
