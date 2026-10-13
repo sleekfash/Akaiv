@@ -128,6 +128,8 @@ jobs:
       - name: Browser authentication and case workflows
         run: |
           php artisan queue:work --sleep=1 --tries=1 --timeout=120 >/tmp/akaiv-pilot-worker.log 2>&1 &
+          php-fpm8.3 -m
+          php-fpm8.3 -i | rg '^opcache\\.(jit|enable)'
           bash tests/pilot/start-http.sh
           for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:8000/admin/login >/dev/null; then break; fi; sleep 1; done
           node tests/pilot/browser.mjs

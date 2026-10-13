@@ -56,5 +56,5 @@ pilot_environment=()
 for name in APP_ENV APP_DEBUG APP_URL APP_KEY DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD SESSION_DRIVER SESSION_SECURE_COOKIE CACHE_STORE QUEUE_CONNECTION MAIL_MAILER CLAMAV_HOST AWS_ENDPOINT AWS_DEFAULT_REGION AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_USE_PATH_STYLE_ENDPOINT REDIS_HOST PILOT_TEST_MODE; do
   pilot_environment+=("$name=${!name}")
 done
-sudo env "${pilot_environment[@]}" /usr/sbin/php-fpm8.3 -y /tmp/akaiv-pilot-fpm.conf > /tmp/akaiv-pilot-fpm.log 2>&1 &
+sudo env "${pilot_environment[@]}" /usr/sbin/php-fpm8.3 -d opcache.jit=off -d opcache.jit_buffer_size=0 -y /tmp/akaiv-pilot-fpm.conf > /tmp/akaiv-pilot-fpm.log 2>&1 &
 sudo nginx -c /tmp/akaiv-pilot-nginx.conf -g 'daemon off;' > /tmp/akaiv-pilot-server.log 2>&1 &
