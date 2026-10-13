@@ -9,6 +9,7 @@ use App\Services\ArchiveAudit;
 use App\Services\ArchiveWorkflow;
 use App\Services\FileIngestion;
 use Aws\S3\S3Client;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -33,7 +34,7 @@ session(['active_organization_id' => $clerk->organizations()->first()->id]);
 $case = CaseFile::where('title', 'Synthetic Pilot Case')->firstOrFail();
 $disk = Storage::disk('s3');
 $clean = null;
-foreach (['clean' => 'Synthetic private pilot judgment', 'infected' => 'X5O!P%@AP[4'.'\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*', 'error' => 'Synthetic scanner outage document'] as $state => $bytes) {
+foreach (['clean' => 'Synthetic original judgment', 'infected' => 'X5O!P%@AP[4'.'\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*', 'error' => 'Synthetic scanner outage document'] as $state => $bytes) {
     $incoming = 'org_'.$case->organization_id.'/incoming/user_'.$clerk->id.'/'.$state.'.txt';
     pilotAssert($disk->put($incoming, $bytes, ['visibility' => 'private']), 'S3 incoming upload failed');
     $doc = app(FileIngestion::class)->save(['storage_path' => $incoming, 'case_id' => $case->id, 'friendly_name' => 'Pilot '.$state.' judgment', 'judicial_document_type' => 'judgment', 'date_delivered' => '2026-10-13'], $clerk);
@@ -59,6 +60,18 @@ foreach (['clean' => 'Synthetic private pilot judgment', 'infected' => 'X5O!P%@A
     if ($state === 'clean') {
         $clean = $doc->fresh();
     }
+}
+$replacement = 'org_'.$case->organization_id.'/incoming/user_'.$clerk->id.'/replacement.txt';
+$disk->put($replacement, 'Synthetic private pilot judgment', ['visibility' => 'private']);
+$clean = app(FileIngestion::class)->save(['storage_path' => $replacement, 'friendly_name' => 'Pilot clean judgment'], $clerk, $clean);
+pilotAssert($clean->versions()->count() === 2 && $clean->scan_state === 'pending', 'Replacement must preserve history and reset scan eligibility');
+(new VirusScanDocumentJob($clean))->handle();
+$other = DB::table('organizations')->where('slug', 'other-synthetic')->value('id');
+try {
+    DB::transaction(fn () => DB::table('documents')->where('id', $clean->id)->update(['organization_id' => $other]));
+    throw new RuntimeException('Raw cross-tenant database mutation succeeded');
+} catch (QueryException $e) {
+    pilotAssert($e->getCode() === '23503', 'Expected tenant foreign-key rejection');
 }
 $pending = app(ArchiveWorkflow::class)->transition($clean, $clerk, 'pending_review', 'draft');
 try {

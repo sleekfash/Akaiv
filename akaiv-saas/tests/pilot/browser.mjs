@@ -27,6 +27,8 @@ try {
   await page.getByLabel('Title', { exact: true }).fill('Browser Created Synthetic Case');
   await page.getByLabel('Suit number', { exact: true }).fill('BROWSER / 2026 / 1');
   await page.getByLabel('Subject matter', { exact: true }).fill('Browser pilot proof');
+  await page.getByLabel('Role', { exact: true }).selectOption('Claimant');
+  await page.getByLabel('Name', { exact: true }).fill('Synthetic Party');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.waitForURL(url => /\/admin\/cases\/\d+\/edit/.test(url.pathname)); checks++;
   await page.getByLabel('Subject matter', { exact: true }).fill('Browser edited metadata');
@@ -62,7 +64,7 @@ try {
   const log = readFileSync('storage/logs/laravel.log', 'utf8').replace(/=\r?\n/g, '').replace(/=3D/g, '=');
   const urls = log.match(/http:\/\/127\.0\.0\.1:8000\/admin\/password-reset\/reset\?[^\s<>\"]+/g);
   assert.ok(urls?.length, 'Reset mail must be captured by the isolated log transport');
-  await reset.goto(urls.at(-1).replace(/&amp;/g, '&'));
+  await reset.goto(urls.at(-1).replace(/&amp;/g, '&').replace(/\)$/, ''));
   await reset.getByLabel('Password', { exact: true }).fill('Synthetic-Changed-2026!');
   await reset.getByLabel('Confirm password', { exact: true }).fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Reset password', exact: true }).click();

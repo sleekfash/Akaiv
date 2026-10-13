@@ -90,6 +90,7 @@ jobs:
           php artisan migrate --force
           set -o pipefail
           vendor/bin/pest --colors=never | tee -a "$GITHUB_STEP_SUMMARY"
+          for attempt in 1 2 3; do vendor/bin/pest --colors=never --filter="denies unscanned"; done
 
       - name: Synthetic test failure diagnostics
         if: failure()
