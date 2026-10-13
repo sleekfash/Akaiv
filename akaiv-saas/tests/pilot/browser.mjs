@@ -38,7 +38,9 @@ try {
   await page.waitForURL(url => /\/admin\/cases\/\d+\/edit/.test(url.pathname)); checks++;
   await page.locator('input[id="data.subject_matter"]').fill('Browser edited metadata');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await page.getByText('Saved', { exact: true }).waitFor(); checks++;
+  await page.getByText('Saved', { exact: true }).waitFor();
+  await page.reload();
+  assert.equal(await page.locator('input[id="data.subject_matter"]').inputValue(), 'Browser edited metadata'); checks++;
   for (const resource of ['documents', 'proceedings', 'audits']) {
     const response = await page.goto(`${base}/admin/${resource}`);
     assert.equal(response.status(), 200); checks++;
