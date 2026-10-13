@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 const base = process.env.PILOT_BASE_URL || 'http://127.0.0.1:8000';
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
@@ -8,8 +9,8 @@ const browser = await chromium.launch({ headless: true, ...(process.env.PILOT_CH
 const errors = [];
 let checks = 0;
 let lastPage;
-async function login(name) {
-  const context = await browser.newContext();
+async function login(name, viewport) {
+  const context = await browser.newContext(viewport ? {viewport} : {});
   const page = await context.newPage();
   lastPage = page;
   page.on('pageerror', error => errors.push(error.message));
@@ -52,10 +53,39 @@ try {
   assert.equal(file.status(), 200);
   assert.equal(await file.text(), 'Synthetic private pilot judgment'); checks++;
   assert.equal((await context.request.get(href.replace(/signature=[^&]+/, 'signature=invalid'))).status(), 403); checks++;
+  await page.goto(`${base}/admin/documents/create`);
+  await page.locator('input[id="data.friendly_name"]').fill('Browser uploaded judgment');
+  await page.locator('.choices').filter({has: page.locator('select[id="data.case_id"]')}).locator('.choices__inner').click();
+  await page.locator('.choices__input--cloned:visible').fill('Synthetic Pilot Case');
+  await page.locator('.choices__list--dropdown:visible').getByRole('option', {name: 'Synthetic Pilot Case', exact: true}).click();
+  await page.locator('select[id="data.judicial_document_type"]').selectOption('judgment');
+  await page.locator('input[id="data.date_delivered"]').fill('2026-10-13');
+  await page.locator('input[type="file"]').setInputFiles({name:'browser-judgment.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic browser-uploaded judgment')});
+  await page.locator('.filepond--item[data-filepond-item-state="processing-complete"]').waitFor();
+  await page.getByRole('button', {name:'Create',exact:true}).click();
+  await page.waitForURL(url => /\/admin\/documents\/[^/]+\/edit/.test(url.pathname));
+  for (let attempt=0;attempt<60;attempt++) {
+    const state=JSON.parse(execFileSync('php',['tests/pilot/browser-state.php'],{encoding:'utf8'}));
+    if(state.scan_state==='clean') break;
+    if(state.scan_state==='error'||state.scan_state==='infected') throw new Error('Browser upload failed scanning');
+    await delay(1000);
+  }
+  assert.equal(JSON.parse(execFileSync('php',['tests/pilot/browser-state.php'],{encoding:'utf8'})).scan_state,'clean'); checks++;
+  await page.goto(`${base}/admin/documents`);
+  const uploaded=page.getByRole('row').filter({hasText:'Browser uploaded judgment'});
+  await uploaded.getByRole('button',{name:'Submit',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+  await uploaded.getByText('pending_review',{exact:true}).waitFor(); checks++;
+  assert.equal(await uploaded.getByRole('button',{name:'Publish',exact:true}).count(),0); checks++;
   await context.close();
   const judge = await login('judge');
   await judge.page.goto(`${base}/admin/cases`);
   await judge.page.getByText('Synthetic Sealed Case', { exact: true }).waitFor(); checks++;
+  await judge.page.goto(`${base}/admin/documents`);
+  const review=judge.page.getByRole('row').filter({hasText:'Browser uploaded judgment'});
+  await review.getByRole('button',{name:'Publish',exact:true}).click();
+  await judge.page.getByRole('dialog').getByRole('button',{name:'Confirm',exact:true}).click();
+  await review.getByText('published',{exact:true}).waitFor(); checks++;
   await judge.context.close();
   const reader = await login('reader');
   await reader.page.goto(`${base}/admin/cases`);
@@ -64,6 +94,11 @@ try {
   await reader.page.goto(`${base}/admin/documents`);
   assert.equal(await reader.page.getByRole('button', { name: 'Archive', exact: true }).count(), 0); checks++;
   await reader.context.close();
+  const mobile=await login('clerk',{width:390,height:844});
+  await mobile.page.goto(`${base}/admin/cases`);
+  await mobile.page.getByText('Synthetic Pilot Case',{exact:true}).waitFor();
+  assert.ok(await mobile.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1)); checks++;
+  await mobile.context.close();
   const anonymous = await browser.newContext();
   const reset = await anonymous.newPage();
   lastPage = reset;

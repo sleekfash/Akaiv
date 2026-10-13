@@ -62,6 +62,20 @@ class DocumentResource extends Resource
                     ->directory(fn () => 'org_'.app(TenantContext::class)->id().'/incoming/user_'.auth()->id())
                     ->storeFileNamesIn('original_filename')
                     ->visibility('private')
+                    ->previewable(false)
+                    ->getUploadedFileUsing(static function (FileUpload $component, string $file, string|array|null $storedFileNames): ?array {
+                        $record = $component->getRecord();
+                        if (! $record instanceof Document || $file !== $record->storage_path || ! $component->getDisk()->exists($file)) {
+                            return null;
+                        }
+
+                        return [
+                            'name' => is_string($storedFileNames) ? $storedFileNames : $record->original_filename,
+                            'size' => $component->getDisk()->size($file),
+                            'type' => $record->mime_type ?: 'application/octet-stream',
+                            'url' => URL::temporarySignedRoute('documents.preview', now()->addMinutes(5), ['document' => $record->uuid]),
+                        ];
+                    })
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->acceptedFileTypes([
                         'application/pdf',

@@ -34,6 +34,8 @@ function legacyFixture(): string
 it('dry-run changes no users, records, storage or queued jobs', function (): void {
     Storage::fake('s3');
     Queue::fake();
+    Storage::disk('s3')->put('pre-existing.txt', 'Synthetic existing archive bytes');
+    $beforeFiles = Storage::disk('s3')->allFiles();
     $root = legacyFixture();
     $counts = [];
     foreach (['users', 'documents', 'folders', 'import_batches', 'import_items', 'archive_audit_events'] as $table) {
@@ -43,12 +45,15 @@ it('dry-run changes no users, records, storage or queued jobs', function (): voi
     foreach ($counts as $table => $count) {
         expect(DB::table($table)->count())->toBe($count);
     }
-    expect(Storage::disk('s3')->allFiles())->toBeEmpty();
+    expect(Storage::disk('s3')->allFiles())->toBe($beforeFiles)
+        ->and(Storage::disk('s3')->get('pre-existing.txt'))->toBe('Synthetic existing archive bytes');
     Queue::assertNothingPushed();
 });
 it('requires an explicit authorized actor and stages rather than publishes', function (): void {
     Storage::fake('s3');
     Queue::fake();
+    Storage::disk('s3')->put('pre-existing.txt', 'Synthetic existing archive bytes');
+    $beforeFiles = Storage::disk('s3')->allFiles();
     $org = Organization::where('slug', 'default')->first();
     $actor = User::create(['name' => 'Importer', 'email' => 'importer@example.test', 'password' => 'test-secret']);
     $actor->organizations()->attach($org->id, ['role' => 'member_write']);
@@ -58,5 +63,6 @@ it('requires an explicit authorized actor and stages rather than publishes', fun
     expect(DB::table('import_items')->count())->toBe(1)
         ->and(Document::withoutGlobalScopes()->count())->toBe(0)
         ->and(DB::table('import_items')->first()->status)->toBe('awaiting_metadata');
-    expect(Storage::disk('s3')->allFiles())->toBeEmpty();
+    expect(Storage::disk('s3')->allFiles())->toBe($beforeFiles)
+        ->and(Storage::disk('s3')->get('pre-existing.txt'))->toBe('Synthetic existing archive bytes');
 });
