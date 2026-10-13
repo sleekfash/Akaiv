@@ -56,7 +56,7 @@ try {
   await page.goto(`${base}/admin/documents/create`);
   await page.locator('input[id="data.friendly_name"]').fill('Browser uploaded judgment');
   await page.locator('.choices').filter({has: page.locator('select[id="data.case_id"]')}).locator('.choices__inner').click();
-  await page.locator('.choices__input--cloned:visible').fill('Synthetic Pilot Case');
+  await page.locator('.choices__input--cloned:visible').pressSequentially('Synthetic Pilot Case', {delay: 30});
   await page.locator('.choices__list--dropdown:visible').getByRole('option', {name: 'Synthetic Pilot Case', exact: true}).click();
   await page.locator('select[id="data.judicial_document_type"]').selectOption('judgment');
   await page.locator('input[id="data.date_delivered"]').fill('2026-10-13');
