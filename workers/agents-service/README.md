@@ -1,31 +1,5 @@
-# AKAIV Agents Service
+# Reserved document-analysis interface
 
-Cloudflare Workers Agents SDK service for document analysis. Each document UUID maps to a Durable Object instance, so analysis counters and future agent state remain isolated per document.
+Phase 1 disables this worker. Both the HTTP entrypoint and retained DocumentAssistant durable-object binding return 404 without processing or storing document content. Laravel does not call the worker. No deployment was performed.
 
-## Local development
-
-```bash
-npm install
-npx wrangler secret put AGENT_SHARED_SECRET
-npm run dev
-```
-
-The Laravel application calls `POST /api/analyze-document` with a bearer token. Configure the Laravel app with:
-
-```dotenv
-DOCUMENT_AGENT_URL=http://localhost:8787
-DOCUMENT_AGENT_SECRET=the-same-value-used-by-wrangler
-```
-
-The Laravel bridge is `POST /documents/{document}/analyze` and requires the authenticated user to pass the document policy.
-
-## Deployment
-
-```bash
-npm run typecheck
-npm run deploy
-```
-
-Set `DOCUMENT_AGENT_URL` in Laravel to the deployed Worker URL and set `DOCUMENT_AGENT_SECRET` to the same secret stored in the Worker. Do not commit either secret.
-
-The Agents SDK route is also available at `/agents/document-assistant/{document-uuid}` for SDK clients using the agent transport.
+The typed payload and binding name are reserved for a separately approved Phase 2 integration. Do not re-enable processing as routine Phase 1 remediation. Run npm ci, npm run typecheck, and npm test to verify containment.

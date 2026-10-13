@@ -11,7 +11,7 @@
 
 - Keep changes scoped to the application named by the task. Prefer the existing patterns, services, policies, scopes, and models in that application.
 - For the active app, preserve tenant isolation through `App\\Scopes\\OrganizationScope` and organization-aware models. Do not bypass authorization or expose permanent storage URLs.
-- Uploads must remain compatible with the documented ClamAV scan, OCR, queue, and signed temporary URL workflow. ClamAV uses `xenolope/quahog`; OCR uses `thiagoalessio/tesseract_ocr`.
+- Phase 1 disables runtime OCR and AI. Uploads must use ClamAV scanning, queues, manual review, and signed temporary routes; preserve future extension hooks. ClamAV uses `xenolope/quahog`; OCR uses `thiagoalessio/tesseract_ocr`.
 - The active app's Filament panel is `App\\Providers\\Filament\\AdminPanelProvider`; keep it registered when changing panel behavior. Shield and package migrations live in `database/migrations/`.
 - Avoid changing generated/vendor/build artifacts, secrets, `.env` files, or storage data.
 - Do not modernize the legacy app as part of active-app work.
@@ -22,9 +22,9 @@
 From `akaiv-saas/`, preferably through the running PHP container:
 
 - Install dependencies reproducibly: `docker exec akaiv-php composer install --no-interaction --prefer-dist`
-- Generate the app key: `docker exec akaiv-php php artisan key:generate --force`
+- Generate an app key only for a new disposable environment; preserve existing keys and never regenerate a live key as setup remediation.
 - Run migrations: `docker exec akaiv-php php artisan migrate --force`
-- Run tests: `docker exec akaiv-php php artisan test` (the scaffold currently has no test directory)
+- Run tests: `docker exec akaiv-php php artisan test` (tests now exist)
 - Check style: `docker exec akaiv-php vendor/bin/pint --test` (expect existing style issues until the codebase is normalized)
 - Inspect routes/config when relevant: `php artisan route:list` and `php artisan config:show`
 - Use Docker services for PostgreSQL, Redis, Meilisearch, ClamAV, Horizon, and scheduler when a check needs infrastructure.

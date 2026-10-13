@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,9 +12,9 @@ use Laravel\Cashier\Billable;
 
 class Organization extends Model
 {
+    use Billable;
     use HasFactory;
     use SoftDeletes;
-    use Billable;
 
     protected $fillable = [
         'name',
@@ -95,6 +94,7 @@ class Organization extends Model
         if ($this->storage_quota_bytes <= 0) {
             return 100.0;
         }
+
         return min(100.0, ($this->storage_used_bytes / $this->storage_quota_bytes) * 100);
     }
 
