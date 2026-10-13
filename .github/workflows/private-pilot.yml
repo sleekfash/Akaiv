@@ -26,7 +26,8 @@ jobs:
       DB_PASSWORD: synthetic-pilot-password
       SESSION_DRIVER: file
       CACHE_STORE: array
-      QUEUE_CONNECTION: database
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: 127.0.0.1
       MAIL_MAILER: log
       PILOT_TEST_MODE: '1'
       PILOT_RESULT_FILE: /tmp/akaiv-pilot-fixture.json
@@ -54,12 +55,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U akaiv"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, intl, pdo_pgsql, bcmath, exif, pcntl, zip, gd
+          extensions: mbstring, intl, pdo_pgsql, bcmath, exif, pcntl, zip, gd, redis
           coverage: none
       - uses: actions/setup-node@v4
         with:
@@ -101,8 +108,14 @@ jobs:
           for writer in 1 2 3 4; do php tests/pilot/audit-writer.php & pids+=("$!"); done
           for pid in "${pids[@]}"; do wait "$pid"; done
           php artisan archive:audit-verify --checkpoint="$PILOT_CHECKPOINT_FILE"
+      - name: Retain a failed real queue job
+        run: |
+          php tests/pilot/queue-probe.php dispatch
+          CLAMAV_PORT=1 php artisan queue:work --once --tries=1 --timeout=30
+          php tests/pilot/queue-probe.php verify
       - name: Browser authentication and case workflows
         run: |
+          php artisan queue:work --sleep=1 --tries=1 --timeout=120 >/tmp/akaiv-pilot-worker.log 2>&1 &
           php artisan serve --host=127.0.0.1 --port=8000 >/tmp/akaiv-pilot-server.log 2>&1 &
           for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:8000/admin/login >/dev/null; then break; fi; sleep 1; done
           node tests/pilot/browser.mjs
@@ -127,4 +140,5 @@ jobs:
         if: failure()
         run: |
           test ! -f /tmp/akaiv-pilot-server.log || tail -40 /tmp/akaiv-pilot-server.log
+          test ! -f /tmp/akaiv-pilot-worker.log || tail -40 /tmp/akaiv-pilot-worker.log
           docker logs --tail 30 pilot-clam || true

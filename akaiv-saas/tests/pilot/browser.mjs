@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 const base = process.env.PILOT_BASE_URL || 'http://127.0.0.1:8000';
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
 const browser = await chromium.launch({ headless: true, ...(process.env.PILOT_CHROMIUM_PATH ? { executablePath: process.env.PILOT_CHROMIUM_PATH } : {}) });
@@ -63,6 +64,10 @@ try {
   await reset.getByLabel('Email address').fill('reader@example.test');
   await reset.getByRole('button', { name: 'Send email', exact: true }).click();
   await reset.getByText('We have emailed your password reset link.', { exact: true }).waitFor();
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if (existsSync('storage/logs/laravel.log') && readFileSync('storage/logs/laravel.log', 'utf8').includes('/admin/password-reset/reset?')) break;
+    await delay(1000);
+  }
   const log = readFileSync('storage/logs/laravel.log', 'utf8').replace(/=\r?\n/g, '').replace(/=3D/g, '=');
   const urls = log.match(/http:\/\/127\.0\.0\.1:8000\/admin\/password-reset\/reset\?[^\s<>\"]+/g);
   assert.ok(urls?.length, 'Reset mail must be captured by the isolated log transport');

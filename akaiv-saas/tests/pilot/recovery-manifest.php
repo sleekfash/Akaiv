@@ -7,7 +7,7 @@ use App\Services\ArchiveAudit;
 use Illuminate\Support\Facades\DB;
 
 $path = getenv('PILOT_RECOVERY_MANIFEST');
-$tables = ['users', 'organizations', 'organization_user', 'cases', 'case_access_grants', 'case_proceedings', 'documents', 'document_versions', 'archive_audit_events', 'domain_events', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions'];
+$tables = ['users', 'organizations', 'organization_user', 'cases', 'case_access_grants', 'case_proceedings', 'documents', 'document_versions', 'archive_audit_events', 'domain_events', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions', 'failed_jobs'];
 $counts = [];
 $fingerprints = [];
 foreach ($tables as $table) {
