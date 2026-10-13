@@ -80,7 +80,7 @@ jobs:
           npm run build
           npx playwright install --with-deps chromium
           sudo apt-get update -qq
-          sudo apt-get install -y rclone postgresql-client-16
+          sudo apt-get install -y rclone postgresql-client-16 php8.3-fpm nginx
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
@@ -128,7 +128,7 @@ jobs:
       - name: Browser authentication and case workflows
         run: |
           php artisan queue:work --sleep=1 --tries=1 --timeout=120 >/tmp/akaiv-pilot-worker.log 2>&1 &
-          (cd public && PHP_CLI_SERVER_WORKERS=4 php -d log_errors=1 -d error_log=/tmp/akaiv-pilot-php-errors.log -S 127.0.0.1:8000 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php) >/tmp/akaiv-pilot-server.log 2>&1 &
+          bash tests/pilot/start-http.sh
           for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:8000/admin/login >/dev/null; then break; fi; sleep 1; done
           node tests/pilot/browser.mjs
       - name: Isolated database and object recovery
@@ -154,5 +154,5 @@ jobs:
           test ! -f /tmp/akaiv-pilot-server.log || tail -40 /tmp/akaiv-pilot-server.log
           test ! -f /tmp/akaiv-pilot-worker.log || tail -40 /tmp/akaiv-pilot-worker.log
           test ! -f storage/logs/laravel.log || tail -150 storage/logs/laravel.log
-          test ! -f /tmp/akaiv-pilot-php-errors.log || tail -80 /tmp/akaiv-pilot-php-errors.log
+          for log in /tmp/akaiv-pilot-fpm-error.log /tmp/akaiv-pilot-fpm.log /tmp/akaiv-pilot-nginx-error.log; do test ! -f "$log" || tail -60 "$log"; done
           docker logs --tail 30 pilot-clam || true
