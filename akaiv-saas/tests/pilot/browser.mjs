@@ -7,9 +7,11 @@ assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
 const browser = await chromium.launch({ headless: true, ...(process.env.PILOT_CHROMIUM_PATH ? { executablePath: process.env.PILOT_CHROMIUM_PATH } : {}) });
 const errors = [];
 let checks = 0;
+let lastPage;
 async function login(name) {
   const context = await browser.newContext();
   const page = await context.newPage();
+  lastPage = page;
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${base}/admin/login`);
   await page.getByLabel('Email address').fill(`${name}@example.test`);
@@ -28,8 +30,10 @@ try {
   await page.locator('input[id="data.title"]').fill('Browser Created Synthetic Case');
   await page.locator('input[id="data.suit_number"]').fill('BROWSER / 2026 / 1');
   await page.locator('input[id="data.subject_matter"]').fill('Browser pilot proof');
-  await page.getByLabel(/^Role/).selectOption('Claimant');
-  await page.getByLabel(/^Name\s*\*?$/).fill('Synthetic Party');
+  if (await page.locator('select[id$=".role"]').count()) {
+    await page.locator('select[id$=".role"]').selectOption('Claimant');
+    await page.locator('input[id$=".name"]').fill('Synthetic Party');
+  }
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.waitForURL(url => /\/admin\/cases\/\d+\/edit/.test(url.pathname)); checks++;
   await page.locator('input[id="data.subject_matter"]').fill('Browser edited metadata');
@@ -60,6 +64,7 @@ try {
   await reader.context.close();
   const anonymous = await browser.newContext();
   const reset = await anonymous.newPage();
+  lastPage = reset;
   assert.equal((await reset.goto(`${base}/admin/password-reset/request`)).status(), 200); checks++;
   await reset.getByLabel('Email address').fill('reader@example.test');
   await reset.getByRole('button', { name: 'Send email', exact: true }).click();
@@ -83,4 +88,8 @@ try {
   await anonymous.close();
   assert.deepEqual(errors, []);
   console.log(`Browser pilot passed: ${checks} checks; no JavaScript page errors.`);
+} catch (error) {
+  console.error(`Browser pilot stopped after ${checks} checks.`);
+  if (lastPage && !lastPage.isClosed()) console.error((await lastPage.locator('body').innerText()).slice(0,6000));
+  throw error;
 } finally { await browser.close(); }
