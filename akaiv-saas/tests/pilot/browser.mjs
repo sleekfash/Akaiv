@@ -129,12 +129,12 @@ try {
   const urls = log.match(/http:\/\/127\.0\.0\.1:8000\/admin\/password-reset\/reset\?[^\s<>\"]+/g);
   assert.ok(urls?.length, 'Reset mail must be captured by the isolated log transport');
   await reset.goto(urls.at(-1).replace(/&amp;/g, '&').replace(/\)$/, ''));
-  await reset.getByLabel(/^Password/).fill('Synthetic-Changed-2026!');
-  await reset.getByLabel(/^Confirm password/).fill('Synthetic-Changed-2026!');
+  await reset.locator('input[type="password"]').nth(0).fill('Synthetic-Changed-2026!');
+  await reset.locator('input[type="password"]').nth(1).fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Reset password', exact: true }).click();
   await reset.waitForURL(url => url.pathname === '/admin/login');
   await reset.getByLabel('Email address').fill('reader@example.test');
-  await reset.getByLabel(/^Password/).fill('Synthetic-Changed-2026!');
+  await reset.locator('input[type="password"]').nth(0).fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
   await reset.waitForURL(url => url.pathname === '/admin'); checks++;
   await anonymous.close();
