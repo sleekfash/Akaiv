@@ -10,8 +10,10 @@ class ClamScanner
     public function scan($stream): bool
     {
         $socket = (new Factory)->createClient(sprintf('tcp://%s:%d', config('services.clamav.host'), config('services.clamav.port', 3310)), 10);
-        $client = new Client($socket);
+        $client = new Client($socket, 30, PHP_NORMAL_READ);
         try {
+            // An explicit session keeps the client from auto-closing after its response.
+            $client->startSession();
             $result = $client->scanResourceStream($stream);
             if ($result->isError()) {
                 throw new \RuntimeException('Antivirus returned an error');
