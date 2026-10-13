@@ -111,7 +111,7 @@ jobs:
       - name: Retain a failed real queue job
         run: |
           php tests/pilot/queue-probe.php dispatch
-          CLAMAV_PORT=1 php artisan queue:work --once --tries=1 --timeout=30
+          CLAMAV_PORT=1 php artisan queue:work --stop-when-empty --tries=1 --timeout=30
           php tests/pilot/queue-probe.php verify
       - name: Browser authentication and case workflows
         run: |
