@@ -50,9 +50,9 @@ OCR, AI analysis, public sharing and document-content indexing remain disabled i
 
 ## Remaining release gates
 
-- Validate PostgreSQL migrations, constraints and concurrency with real PostgreSQL, including audit append concurrency and malformed relationship inserts.
-- Run actual ClamAV clean/infected/error integration tests; current automated service tests use synthetic bytes and a scanner test double.
-- Run full browser workflows and object-store integration with isolated accounts.
+- PostgreSQL 16 fresh-schema migrations, tenant foreign-key rejection and four concurrent audit writers pass in the synthetic pilot. Existing production-data reconciliation, runtime/migration role separation and production-scale contention remain required.
+- Actual ClamAV clean, EICAR and unavailable-scanner tests pass in the synthetic pilot. Verify production definition freshness, resource limits, maximum stream size and monitoring.
+- Isolated browser and S3-compatible object-store workflows pass in the synthetic pilot. Verify the actual deployment's TLS, object-store IAM/CORS, mail delivery and PHP runtime configuration.
 - Reconcile legacy metadata/status/tenant references before migration validation or full import.
 - Approve the judicial sealed-access matrix and suit-number uniqueness/normalization policy. Current sealed behavior grants no implicit administrator access and preserves punctuation while normalizing case/whitespace.
 - Demonstrate encrypted off-site backup, isolated PostgreSQL/object restoration, hash reconciliation and audit-anchor verification.
@@ -68,3 +68,18 @@ Local checks: 31 PHP tests / 89 assertions (SQLite, synthetic files and fake sto
 These checks do not establish production readiness. Before release, prove PostgreSQL migrations/constraints and concurrent writes, real ClamAV and private object-store behavior, browser workflows, existing-record normalization and scan-state mapping, and an isolated offsite backup restore. Configure the production domain/TLS and independent audit checkpoints. Previously committed credentials still require owner-controlled rotation; removing tracked environment files does not remove repository history. No deployment, live migration, real-file import, credential rotation, or history rewrite was performed.
 
 Optional Laravel Pulse telemetry defaults to disabled because its separate schema is not provisioned. Archive audit recording remains active. Provision and review Pulse tables/access before explicitly enabling it; optional telemetry must not introduce missing-table errors into archive requests or transactions.
+
+## Synthetic private pilot validation (2026-10-13)
+
+[Private pilot run 38390215271](https://github.com/sleekfash/Akaiv/actions/runs/38390215271) passed all stages. [Standard CI run 38390215246](https://github.com/sleekfash/Akaiv/actions/runs/38390215246) passed both jobs.
+
+- 35 application tests / 99 assertions on PostgreSQL, frontend checks/build and five disabled-worker containment tests.
+- 21 browser checks with Nginx/PHP-FPM: login; case creation and metadata persistence after reload; tenant and sealed-case visibility; signed preview and signature rejection; actual browser upload to S3; asynchronous antivirus scan; submit, self-review restriction and separate-review publication; read-only restrictions; mobile layout; queued password-reset mail captured by the log transport and login with the changed password. Fixture identities with broad permissions intentionally exercise independent membership and reviewer restrictions; this is not court-owner approval of the final permission matrix.
+- Real S3-compatible private objects and immutable revisions; clean/EICAR/scanner-outage outcomes; raw PostgreSQL tenant-FK rejection; four concurrent audit writers; real Redis retry exhaustion with a retained failed-job record.
+- Quiesced synthetic writers; custom PostgreSQL dump and object copy; restoration into a new empty `_restore_test` database and object directory; matching record fingerprints, grants/roles, current/historical file hashes and independent audit checkpoint.
+
+Livewire intentionally substitutes empty S3 upload signatures in unit-test mode. The real browser fixture therefore uses `APP_ENV=pilot`, `PILOT_TEST_MODE=1` and a guarded disposable database. HTTP-only fixture cookies are explicitly non-secure; production cookies remain secure by default. No live account was created/reset and no real email or archive document was sent.
+
+PHP-FPM's runner defaults enabled JIT with a 256 MB buffer. Intermittent worker SIGSEGVs occurred during browser requests. The validated FPM command explicitly disables JIT while retaining OPcache; the prepared Docker PHP INI also disables JIT. Confirm the effective settings and stability in the actual deployment rather than inferring production runtime readiness from CI.
+
+This proves synthetic isolated recovery, not encrypted off-site production disaster recovery. Off-site encryption/retention, actual-provider permissions, real-data mapping, credential rotation and deployment review remain release gates. Nothing was merged, deployed, imported into a live archive, or applied to a live database.
