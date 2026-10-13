@@ -25,8 +25,10 @@ php_admin_value[post_max_size] = 256M
 php_admin_flag[log_errors] = on
 FPM
 python3 - <<'PY'
-import os
-config = '''events { worker_connections 128; }
+import os, pwd, grp
+config = '''user __PILOT_USER__ __PILOT_GROUP__;
+pid /tmp/akaiv-pilot-nginx.pid;
+events { worker_connections 128; }
 http {
     include /etc/nginx/mime.types;
     access_log /tmp/akaiv-pilot-nginx-access.log;
@@ -48,7 +50,7 @@ http {
     }
 }
 '''
-open('/tmp/akaiv-pilot-nginx.conf', 'w').write(config.replace('__PUBLIC_ROOT__', os.getcwd()+'/public'))
+open('/tmp/akaiv-pilot-nginx.conf', 'w').write(config.replace('__PUBLIC_ROOT__', os.getcwd()+'/public').replace('__PILOT_USER__', pwd.getpwuid(os.getuid()).pw_name).replace('__PILOT_GROUP__', grp.getgrgid(os.getgid()).gr_name))
 PY
 pilot_environment=()
 for name in APP_ENV APP_DEBUG APP_URL APP_KEY DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD SESSION_DRIVER SESSION_SECURE_COOKIE CACHE_STORE QUEUE_CONNECTION MAIL_MAILER CLAMAV_HOST AWS_ENDPOINT AWS_DEFAULT_REGION AWS_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_USE_PATH_STYLE_ENDPOINT REDIS_HOST PILOT_TEST_MODE; do

@@ -154,5 +154,5 @@ jobs:
           test ! -f /tmp/akaiv-pilot-server.log || tail -40 /tmp/akaiv-pilot-server.log
           test ! -f /tmp/akaiv-pilot-worker.log || tail -40 /tmp/akaiv-pilot-worker.log
           test ! -f storage/logs/laravel.log || tail -150 storage/logs/laravel.log
-          for log in /tmp/akaiv-pilot-fpm-error.log /tmp/akaiv-pilot-fpm.log /tmp/akaiv-pilot-nginx-error.log; do test ! -f "$log" || tail -60 "$log"; done
+          for log in /tmp/akaiv-pilot-fpm-error.log /tmp/akaiv-pilot-fpm.log /tmp/akaiv-pilot-nginx-error.log; do test ! -f "$log" || sudo tail -60 "$log"; done
           docker logs --tail 30 pilot-clam || true
