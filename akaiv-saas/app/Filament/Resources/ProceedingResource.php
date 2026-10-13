@@ -40,7 +40,7 @@ class ProceedingResource extends Resource
             Tables\Filters\Filter::make('sessions')->form([Forms\Components\DatePicker::make('from'), Forms\Components\DatePicker::make('until')])->query(fn ($query, array $data) => $query->when($data['from'] ?? null, fn ($q, $date) => $q->whereDate('session_date', '>=', $date))->when($data['until'] ?? null, fn ($q, $date) => $q->whereDate('session_date', '<=', $date))),
         ])->actions([
             Tables\Actions\EditAction::make(),
-            Tables\Actions\Action::make('publish')->visible(fn ($record) => $record->status === 'draft' && auth()->user()->checkPermissionTo('document.review'))->requiresConfirmation()->action(fn ($record) => app(ArchiveWorkflow::class)->publishProceeding($record, auth()->user())),
+            Tables\Actions\Action::make('publish')->visible(fn ($record) => auth()->user()->can('update', $record) && (int) ($record->updated_by ?? $record->created_by) !== (int) auth()->id() && auth()->user()->checkPermissionTo('document.review'))->requiresConfirmation()->action(fn ($record) => app(ArchiveWorkflow::class)->publishProceeding($record, auth()->user())),
         ])->bulkActions([]);
     }
 

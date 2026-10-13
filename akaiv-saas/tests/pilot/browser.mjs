@@ -12,7 +12,7 @@ async function login(name) {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${base}/admin/login`);
   await page.getByLabel('Email address').fill(`${name}@example.test`);
-  await page.getByLabel('Password', { exact: true }).fill('Synthetic-Pilot-2026!');
+  await page.locator('input[id="data.password"]').fill('Synthetic-Pilot-2026!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL(url => url.pathname === '/admin');
   return { page, context };
@@ -24,14 +24,14 @@ try {
   assert.equal(await page.getByText('Synthetic Sealed Case', { exact: true }).count(), 0); checks++;
   assert.equal(await page.getByText('Other Tenant Private Case', { exact: true }).count(), 0); checks++;
   await page.goto(`${base}/admin/cases/create`);
-  await page.getByLabel('Title', { exact: true }).fill('Browser Created Synthetic Case');
-  await page.getByLabel('Suit number', { exact: true }).fill('BROWSER / 2026 / 1');
-  await page.getByLabel('Subject matter', { exact: true }).fill('Browser pilot proof');
-  await page.getByLabel('Role', { exact: true }).selectOption('Claimant');
-  await page.getByLabel('Name', { exact: true }).fill('Synthetic Party');
+  await page.locator('input[id="data.title"]').fill('Browser Created Synthetic Case');
+  await page.locator('input[id="data.suit_number"]').fill('BROWSER / 2026 / 1');
+  await page.locator('input[id="data.subject_matter"]').fill('Browser pilot proof');
+  await page.getByLabel(/^Role/).selectOption('Claimant');
+  await page.getByLabel(/^Name\s*\*?$/).fill('Synthetic Party');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.waitForURL(url => /\/admin\/cases\/\d+\/edit/.test(url.pathname)); checks++;
-  await page.getByLabel('Subject matter', { exact: true }).fill('Browser edited metadata');
+  await page.locator('input[id="data.subject_matter"]').fill('Browser edited metadata');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await page.getByText('Saved', { exact: true }).waitFor(); checks++;
   for (const resource of ['documents', 'proceedings', 'audits']) {
@@ -54,6 +54,8 @@ try {
   await reader.page.goto(`${base}/admin/cases`);
   assert.equal(await reader.page.getByRole('link', { name: 'New case', exact: true }).count(), 0); checks++;
   assert.equal((await reader.page.goto(`${base}/admin/cases/create`)).status(), 403); checks++;
+  await reader.page.goto(`${base}/admin/documents`);
+  assert.equal(await reader.page.getByRole('button', { name: 'Archive', exact: true }).count(), 0); checks++;
   await reader.context.close();
   const anonymous = await browser.newContext();
   const reset = await anonymous.newPage();
@@ -65,12 +67,12 @@ try {
   const urls = log.match(/http:\/\/127\.0\.0\.1:8000\/admin\/password-reset\/reset\?[^\s<>\"]+/g);
   assert.ok(urls?.length, 'Reset mail must be captured by the isolated log transport');
   await reset.goto(urls.at(-1).replace(/&amp;/g, '&').replace(/\)$/, ''));
-  await reset.getByLabel('Password', { exact: true }).fill('Synthetic-Changed-2026!');
-  await reset.getByLabel('Confirm password', { exact: true }).fill('Synthetic-Changed-2026!');
+  await reset.locator('input[id="data.password"]').fill('Synthetic-Changed-2026!');
+  await reset.locator('input[id="data.passwordConfirmation"]').fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Reset password', exact: true }).click();
   await reset.waitForURL(url => url.pathname === '/admin/login');
   await reset.getByLabel('Email address').fill('reader@example.test');
-  await reset.getByLabel('Password', { exact: true }).fill('Synthetic-Changed-2026!');
+  await reset.locator('input[id="data.password"]').fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
   await reset.waitForURL(url => url.pathname === '/admin'); checks++;
   await anonymous.close();

@@ -114,13 +114,13 @@ class DocumentResource extends Resource
                     ))
                     ->openUrlInNewTab()
                     ->visible(fn (Document $record): bool => auth()->user()->can('view', $record) && app(ArchiveAccess::class)->eligible($record)),
-                Action::make('submit')->visible(fn (Document $record) => $record->status === 'draft' && auth()->user()->checkPermissionTo('document.submit'))
+                Action::make('submit')->visible(fn (Document $record) => $record->status === 'draft' && self::canTransition($record) && auth()->user()->checkPermissionTo('document.submit'))
                     ->requiresConfirmation()->action(fn (Document $record) => app(ArchiveWorkflow::class)->transition($record, auth()->user(), 'pending_review', 'draft')),
-                Action::make('publish')->visible(fn (Document $record) => $record->status === 'pending_review' && auth()->user()->checkPermissionTo('document.review'))
+                Action::make('publish')->visible(fn (Document $record) => (int) ($record->last_modified_by ?? $record->uploaded_by) !== (int) auth()->id() && $record->status === 'pending_review' && self::canTransition($record) && auth()->user()->checkPermissionTo('document.review'))
                     ->requiresConfirmation()->action(fn (Document $record) => app(ArchiveWorkflow::class)->transition($record, auth()->user(), 'published', 'pending_review')),
-                Action::make('return_to_draft')->visible(fn (Document $record) => $record->status === 'pending_review' && auth()->user()->checkPermissionTo('document.review'))
+                Action::make('return_to_draft')->visible(fn (Document $record) => $record->status === 'pending_review' && self::canTransition($record) && auth()->user()->checkPermissionTo('document.review'))
                     ->requiresConfirmation()->action(fn (Document $record) => app(ArchiveWorkflow::class)->transition($record, auth()->user(), 'draft', 'pending_review')),
-                Action::make('archive')->visible(fn (Document $record) => $record->status === 'published' && auth()->user()->checkPermissionTo('document.review'))
+                Action::make('archive')->visible(fn (Document $record) => $record->status === 'published' && self::canTransition($record) && auth()->user()->checkPermissionTo('document.review'))
                     ->requiresConfirmation()->action(fn (Document $record) => app(ArchiveWorkflow::class)->transition($record, auth()->user(), 'archived', 'published')),
                 RestoreAction::make()->requiresConfirmation(),
                 EditAction::make(),
@@ -131,6 +131,12 @@ class DocumentResource extends Resource
                     ->requiresConfirmation(),
             ])
             ->bulkActions([]);
+    }
+
+    private static function canTransition(Document $record): bool
+    {
+        return app(TenantContext::class)->canWrite(auth()->user(), (int) $record->organization_id)
+            && app(ArchiveAccess::class)->document(auth()->user(), $record);
     }
 
     public static function getPages(): array

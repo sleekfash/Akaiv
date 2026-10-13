@@ -98,7 +98,7 @@ class CaseResource extends Resource
             ])
             ->actions([
                 Action::make('seal')->label('Seal / set grants')
-                    ->visible(fn ($record) => auth()->user()->checkPermissionTo('case.seal'))
+                    ->visible(fn ($record) => auth()->user()->can('update', $record) && auth()->user()->checkPermissionTo('case.seal'))
                     ->form([Select::make('user_ids')->label('Explicitly authorized members')->multiple()->options(fn ($record) => $record->organization->users()->pluck('name', 'users.id')->all())->required()])
                     ->requiresConfirmation()->action(fn ($record, array $data) => app(SealedCases::class)->seal($record, auth()->user(), $data['user_ids'])),
                 EditAction::make(),
