@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 const base = process.env.PILOT_BASE_URL || 'http://127.0.0.1:8000';
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
 const browser = await chromium.launch({ headless: true, ...(process.env.PILOT_CHROMIUM_PATH ? { executablePath: process.env.PILOT_CHROMIUM_PATH } : {}) });
@@ -35,6 +36,13 @@ try {
     const response = await page.goto(`${base}/admin/${resource}`);
     assert.equal(response.status(), 200); checks++;
   }
+  await page.goto(`${base}/admin/documents`);
+  const preview = page.getByRole('link', { name: 'Preview', exact: true }).first();
+  const href = await preview.getAttribute('href');
+  const file = await context.request.get(href);
+  assert.equal(file.status(), 200);
+  assert.equal(await file.text(), 'Synthetic private pilot judgment'); checks++;
+  assert.equal((await context.request.get(href.replace(/signature=[^&]+/, 'signature=invalid'))).status(), 403); checks++;
   await context.close();
   const judge = await login('judge');
   await judge.page.goto(`${base}/admin/cases`);
@@ -48,6 +56,21 @@ try {
   const anonymous = await browser.newContext();
   const reset = await anonymous.newPage();
   assert.equal((await reset.goto(`${base}/admin/password-reset/request`)).status(), 200); checks++;
+  await reset.getByLabel('Email address').fill('reader@example.test');
+  await reset.getByRole('button', { name: 'Send email', exact: true }).click();
+  await reset.getByText('We have emailed your password reset link.', { exact: true }).waitFor();
+  const log = readFileSync('storage/logs/laravel.log', 'utf8').replace(/=\r?\n/g, '').replace(/=3D/g, '=');
+  const urls = log.match(/http:\/\/127\.0\.0\.1:8000\/admin\/password-reset\/reset\?[^\s<>\"]+/g);
+  assert.ok(urls?.length, 'Reset mail must be captured by the isolated log transport');
+  await reset.goto(urls.at(-1).replace(/&amp;/g, '&'));
+  await reset.getByLabel('Password', { exact: true }).fill('Synthetic-Changed-2026!');
+  await reset.getByLabel('Confirm password', { exact: true }).fill('Synthetic-Changed-2026!');
+  await reset.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await reset.waitForURL(url => url.pathname === '/admin/login');
+  await reset.getByLabel('Email address').fill('reader@example.test');
+  await reset.getByLabel('Password', { exact: true }).fill('Synthetic-Changed-2026!');
+  await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await reset.waitForURL(url => url.pathname === '/admin'); checks++;
   await anonymous.close();
   assert.deepEqual(errors, []);
   console.log(`Browser pilot passed: ${checks} checks; no JavaScript page errors.`);

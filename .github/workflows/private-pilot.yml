@@ -73,9 +73,18 @@ jobs:
           npx playwright install --with-deps chromium
           sudo apt-get update -qq
           sudo apt-get install -y rclone postgresql-client-16
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Build pinned isolated S3 test server
+        run: |
+          git clone --depth 1 --branch RELEASE.2025-10-15T17-29-55Z https://github.com/minio/minio.git /tmp/pilot-minio-source
+          cd /tmp/pilot-minio-source
+          go build -o /tmp/pilot-minio .
       - name: Start isolated antivirus and private storage
         run: |
-          docker run -d --name pilot-minio -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" minio/minio:latest server /data
+          MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" /tmp/pilot-minio server /tmp/pilot-minio-data --address 127.0.0.1:9000 >/tmp/pilot-minio.log 2>&1 &
           docker run -d --name pilot-clam -p 127.0.0.1:3310:3310 clamav/clamav:stable
           for attempt in $(seq 1 120); do
             if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null && php -r '$s=@fsockopen("127.0.0.1",3310,$e,$m,1);if(!$s)exit(1);fwrite($s,"zPING\0");exit(str_starts_with(fread($s,10),"PONG")?0:1);'; then exit 0; fi

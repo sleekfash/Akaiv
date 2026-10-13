@@ -91,6 +91,11 @@ jobs:
           set -o pipefail
           vendor/bin/pest --colors=never | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Synthetic test failure diagnostics
+        if: failure()
+        run: |
+          test ! -f storage/logs/laravel.log || tail -150 storage/logs/laravel.log
+
   worker:
     name: Cloudflare Worker (typecheck + test)
     runs-on: ubuntu-latest
