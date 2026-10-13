@@ -40,7 +40,7 @@ The PostgreSQL audit table rejects ordinary UPDATE, DELETE and TRUNCATE. A datab
 
 `archive:export ORGANIZATION_ID ACTOR_ID /new/export.zip` exports authorized published current files, case/proceeding metadata and a checkpoint. `archive:verify-export /new/export.zip` checks hashes, sizes and relationships. This is a portable published-record export, not a full disaster-recovery backup: drafts, inaccessible sealed records, historical file bytes, grants, user credentials and the complete audit history require the coordinated database/object backup.
 
-The backup/isolated-restore scripts are prepared for operator review. They require Docker, pg_dump/pg_restore, rclone configuration, encrypted off-site retention and an empty local test database. Set recovery objectives and retention with the archive owner; these cannot be inferred from code. No successful real PostgreSQL/object restore has yet been demonstrated by this change.
+The backup/isolated-restore scripts are prepared for operator review. They require Docker, pg_dump/pg_restore, rclone configuration, encrypted off-site retention and an empty local test database. Set recovery objectives and retention with the archive owner; these cannot be inferred from code. The 2026-10-13 synthetic pilot demonstrates an isolated PostgreSQL/object restore; encrypted off-site production recovery remains unverified.
 
 ## Production profile
 
