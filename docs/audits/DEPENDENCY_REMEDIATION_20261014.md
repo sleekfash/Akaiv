@@ -37,7 +37,33 @@ Legacy prior scan34 advisory records remains a separate owner-controlled operati
 
 ## Verification checkpoint
 
-Candidate PHP/PostgreSQL/browser verification pending. Exact commit/run IDs and executed results will be recorded here. Current classification: partial remediation READY FOR REVIEW; full dependency-security acceptance BLOCKED by unresolved npm findings/access. No production readiness claim.
+Candidate execution evidence is recorded below. Current classification: partial remediation READY FOR REVIEW; full dependency-security acceptance BLOCKED by unresolved npm findings/access. No production readiness claim.
+
+## Executed candidate verification
+
+Tested code/runtime commit:489d813afdf2a4d8462793b8983abae421095025.
+[CI38605664193](https://github.com/sleekfash/Akaiv/actions/runs/38605664193) passed: Laravel job115995757233 and worker job115995757879. PHP8.3, Node22, disposable PostgreSQL16/Redis7;46 application tests/145 assertions,3 frontend tests, production build/Pint, worker typecheck and5 containment tests. New email and signed-route regressions all executed successfully. CI runs `composer install --no-interaction --prefer-dist --no-progress`, `npm ci --no-audit --no-fund`, `npm run test:frontend`, `npm run build`, `vendor/bin/pint --test`, isolated `php artisan migrate --force`, `vendor/bin/pest --colors=never`, worker `npm run typecheck` and `npm test`. Existing three repeated signed-serving cases each passed2 assertions; not additional unique coverage.
+
+[Dependency security38605664174](https://github.com/sleekfash/Akaiv/actions/runs/38605664174): PHP audit job115995757577 PASSED; frontend115995756970 and worker115995757555 FAILED. No failure suppressed, no advisory allowlist, no production-only exclusion. Independent logs confirm PHP advisories[], abandoned[]. Full security workflow is FAILED despite functional CI success.
+
+[Node22 pilot38605664171](https://github.com/sleekfash/Akaiv/actions/runs/38605664171), job115995757277, tested commit489d813afdf2a4d8462793b8983abae421095025, independently passed:23 browser checks with no page errors; actual isolated S3 immutable/private bytes, ClamAV clean/EICAR/outage, separate publication review, PostgreSQL tenant constraints, four audit writers, Redis retry exhaustion with retained failed job, and coordinated isolated database/object restore with historical/current hashes and independent audit anchor. Login/reset/logout, metadata persistence, read-only/sealed checks and protected serving executed successfully. Node version in CI logs22.23.3. No encrypted off-site production-recovery claim. Earlier Node20 pilot38605109561 also passed but is retained as historical evidence, not substituted for this run. Final report follow-up is documentation-only; run identifiers belong to the tested code/runtime SHA above.
+
+## Milestone progress report
+
+| Required item | Evidence / disposition |
+|---|---|
+| Phase/objective | Dependency-security remediation and isolated compatibility verification. |
+| Verified completed | PHP advisories resolved in supported Laravel12.70/CommonMark2.10.3; compatible frontend updates; Node22 CI compatibility; security regressions and explicit audit gates. |
+| Unsuccessful | Denied npm metadata lookups403; both npm audit jobs still fail. First connector blob upload hit a transient response error; retried same ordinary operation successfully. |
+| Risks | Remaining frontend and worker advisories, unverified Docker/system-package/image security, legacy deployment and credential exposure; no exploitability assumptions. |
+| Blockers | Approved npm registry/workspace access for denied lookups; compatible strategy for advisory-bearing Tailwind3/Stylelint dependencies. Judicial and actual-provider release gates remain unchanged. |
+| Components | Active Composer manifest/lock, frontend lock, DependencySecurityTest, dependency-security/CI/pilot workflows, prepared Docker Node reference, developer runtime version, AGENTS/runbook and this report. No domain services/policies/migrations, worker source or legacy files changed. |
+| Tests |46/145 plus frontend3/worker5,23 browser checks, real synthetic infrastructure/restore and clean PHP audit; exact SHA/run/job IDs above. npm audit FAILED. Docker build/scans and deployed runtime verification NOT executed. |
+| Compliance | No OCR/AI/sharing activation, main merge/deployment/real-data import/production mutation/rotation/history rewrite. |
+| Next safe action | Provide approved registry/runtime access; resolve remaining tooling dependencies with compatibility tests, then repeat full audits. Never infer full completion from clean PHP results. |
+| Approvals | Access direction needed for affected npm work; owner controls any risk acceptance, protected-branch enforcement, live-system changes and separate deployment/import/merge approvals. |
+
+Status: partial technical remediation READY FOR REVIEW; full dependency-security milestone BLOCKED/NOT COMPLETE. Earlier Phase1 reports remain historical evidence rather than silently rewritten acceptance. This report supersedes their PHP dependency status only for this unmerged candidate. Production and migration readiness remain BLOCKED.
 
 ## Runtime lifecycle and first CI security gate
 
