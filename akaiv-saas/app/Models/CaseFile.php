@@ -29,6 +29,7 @@ class CaseFile extends Model
         'case_number',
         'suit_number',
         'title',
+        'parties',
         'parties_json',
         'court_name',
         'bench_judge_name',

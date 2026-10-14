@@ -137,6 +137,11 @@ try {
   await reset.locator('input[type="password"]').nth(0).fill('Synthetic-Changed-2026!');
   await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
   await reset.waitForURL(url => url.pathname === '/admin'); checks++;
+  await reset.getByRole('button', { name: 'User menu', exact: true }).click();
+  await reset.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await reset.waitForURL(url => url.pathname === '/admin/login'); checks++;
+  await reset.goto(`${base}/admin/documents`);
+  assert.equal(new URL(reset.url()).pathname, '/admin/login'); checks++;
   await anonymous.close();
   assert.deepEqual(errors, []);
   console.log(`Browser pilot passed: ${checks} checks; no JavaScript page errors.`);
