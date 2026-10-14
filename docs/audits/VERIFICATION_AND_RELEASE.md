@@ -12,6 +12,8 @@ Before fix: standalone PHP model fill of synthetic `parties` printed `parties_js
 
 Local commands executed: `php vendor/bin/pint app/Models/CaseFile.php tests/Feature/PhaseOneVerificationTest.php` passed; `npm run test:frontend`3 passed; `git diff --check` passed. These checks do not count as executing the new DB/browser tests. Current advisory scans are unsuccessful security gates, detailed in DEPENDENCY_SCAN_20261014.md.
 
+First candidate run38585996666, commit466bd83ec4f1dd65b4630695050dd9c6086ef3ab, Laravel job115928041167: FAILED,39 passed/1 failed,127 assertions. Case-party create/edit regression, required title, document type/date filter and changed-source rollback checks passed. Case search failed because the negative fixture title `Distinct synthetic case` legitimately matches `Synthetic case`; corrected that fixture to `Unrelated appeal`, without changing application search behavior. No failure is reclassified as passed; corrected candidate rerun pending. Worker typecheck/tests passed. Pilot38585996581 still pending at this checkpoint.
+
 ## Prioritized outstanding work
 
 1. Critical: owner assess historical credential validity/exposure and approve controlled rotation where necessary.

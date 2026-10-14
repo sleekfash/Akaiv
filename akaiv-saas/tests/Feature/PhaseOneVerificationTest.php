@@ -37,7 +37,7 @@ it('validates the required case title in the manual entry form', function () {
 
 it('searches case metadata and filters lifecycle states without interpreting SQL input', function () {
     [$org, $actor, $case] = archiveContext($this);
-    $other = CaseFile::create(['organization_id' => $org->id, 'title' => 'Distinct synthetic case', 'status' => 'closed', 'created_by' => $actor->id]);
+    $other = CaseFile::create(['organization_id' => $org->id, 'title' => 'Unrelated appeal', 'status' => 'closed', 'created_by' => $actor->id]);
     foreach (['Synthetic case', 'Land', 'fhc / 1 / 2026', 'FHC/1/2026'] as $search) {
         Livewire::test(ListCases::class)->searchTable($search)
             ->assertCanSeeTableRecords([$case])->assertCanNotSeeTableRecords([$other]);

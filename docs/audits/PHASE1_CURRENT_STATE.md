@@ -24,6 +24,8 @@ Do not mechanically merge document-validation: it includes OCR/text conversion a
 
 Current authenticated login/reset code and case changes were inspected. A separate Authenticator/MFA application or enrolled device was not inspected; MFA enforcement is not verified.
 
+Candidate local commit `8725029` and published integration commit `466bd83ec4f1dd65b4630695050dd9c6086ef3ab` have identical file content (`git diff --exit-code HEAD FETCH_HEAD` passed after explicit integration fetch), but different commit metadata. Draft PR #2 is reviewable without replacing PR #1. GitHub subsequently confirmed mergeable=true; no textual conflicts at this checkpoint. CI runs38585996666 and38585996581 were started by opening PR #2; results must be verified before acceptance.
+
 Initial checkpoint: synthetic baseline integration is verified; real archive reconciliation, approved judicial permissions, supported dependency posture, actual-provider security and operational recovery remain incomplete. Safe autonomous work: documentation, synthetic regressions, focused fixes and CI. Owner approval: policy changes, real imports, production migrations/deployment, credential rotation and merge. See requirements matrix and security gates for severity.
 
 ## Unsuccessful work / limitations
