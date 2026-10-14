@@ -7,8 +7,10 @@ use App\Models\Document;
 
 class DocumentObserver
 {
-    public function created(Document $document): void
+    public function saved(Document $document): void
     {
-        VirusScanDocumentJob::dispatch($document);
+        if ($document->wasRecentlyCreated || $document->wasChanged('file_revision')) {
+            VirusScanDocumentJob::dispatch($document)->afterCommit();
+        }
     }
 }

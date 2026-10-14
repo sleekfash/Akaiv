@@ -59,14 +59,15 @@ class Share extends Model
 
     public function hasPassword(): bool
     {
-        return !empty($this->password_hash);
+        return ! empty($this->password_hash);
     }
 
     public function checkPassword(string $password): bool
     {
-        if (!$this->hasPassword()) {
+        if (! $this->hasPassword()) {
             return true;
         }
+
         return password_verify($password, $this->password_hash);
     }
 
@@ -80,6 +81,7 @@ class Share extends Model
         if ($this->expires_at === null) {
             return false;
         }
+
         return $this->expires_at->isPast();
     }
 
@@ -89,6 +91,7 @@ class Share extends Model
             return true;
         }
         $allowed = array_map('trim', explode(',', $this->allowed_ips_csv));
+
         return in_array($ip, $allowed, true);
     }
 
@@ -97,6 +100,7 @@ class Share extends Model
         if ($this->max_accesses === null) {
             return false;
         }
+
         return $this->access_count >= $this->max_accesses;
     }
 
@@ -108,9 +112,10 @@ class Share extends Model
         if ($this->hasAccessLimitReached()) {
             return false;
         }
-        if (!$this->isIpAllowed($ip)) {
+        if (! $this->isIpAllowed($ip)) {
             return false;
         }
+
         return $this->checkPassword($password ?? '');
     }
 

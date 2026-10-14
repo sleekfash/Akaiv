@@ -2,10 +2,6 @@
 
 @config '../../../../tailwind.config.js';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
     --akaiv-brand-primary: #1e3a8a;
     --akaiv-brand-accent: #0ea5e9;

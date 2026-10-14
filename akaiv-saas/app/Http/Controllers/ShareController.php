@@ -39,6 +39,7 @@ class ShareController extends Controller
 
     private function assertAccessible(Request $request, Share $share): void
     {
+        abort_unless(config('archive.public_sharing_enabled'), 404);
         abort_if($share->isExpired(), 410, 'This share link has expired.');
         abort_if($share->hasAccessLimitReached(), 410, 'This share link has reached its access limit.');
         abort_if(! $share->isIpAllowed((string) $request->ip()), 403, 'Access from this address is not permitted.');

@@ -14,6 +14,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
@@ -25,6 +26,13 @@ class UserResource extends Resource
     protected static ?string $navigationGroup = 'Administration';
 
     protected static ?int $navigationSort = 2;
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        return auth()->user()?->hasRole('Platform SuperAdmin') ? $query : $query->whereRaw('1 = 0');
+    }
 
     public static function form(Form $form): Form
     {

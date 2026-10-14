@@ -3,12 +3,17 @@
 namespace App\Policies;
 
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 use Illuminate\Auth\Access\HandlesAuthorization;
+use Spatie\Permission\Models\Role;
 
 class RolePolicy
 {
     use HandlesAuthorization;
+
+    public function before(User $user, string $ability): bool
+    {
+        return $user->hasRole('Platform SuperAdmin');
+    }
 
     /**
      * Determine whether the user can view any models.

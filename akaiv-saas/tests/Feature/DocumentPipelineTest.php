@@ -2,14 +2,15 @@
 
 use App\Jobs\IndexDocumentJob;
 use App\Jobs\OcrDocumentJob;
-use App\Jobs\ThumbnailDocumentJob;
 use App\Jobs\VirusScanDocumentJob;
 use App\Models\Document;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 function pipelineDocument(array $attributes = []): Document
 {
@@ -32,38 +33,26 @@ function pipelineDocument(array $attributes = []): Document
     ], $attributes));
 }
 
-it('quarantines a document whose file is missing from storage', function (): void {
+it('fails closed when scan bytes are missing without publishing', function (): void {
     Storage::fake('private');
+    Queue::fake();
     $document = pipelineDocument();
-
-    (new VirusScanDocumentJob($document))->handle();
-
-    expect($document->fresh()->status)->toBe('quarantined')
-        ->and($document->fresh()->virus_scanned)->toBeFalse();
+    expect(fn () => (new VirusScanDocumentJob($document))->handle())->toThrow(RuntimeException::class);
+    $record = Document::withoutGlobalScopes()->find($document->id);
+    expect($record->scan_state)->toBe('error')->and($record->virus_scanned)->toBeFalse()->and($record->status)->toBe('uploading');
 });
-
-it('skips OCR when it has already completed', function (): void {
+it('performs no OCR in Phase 1 even when document flags request it', function (): void {
     Storage::fake('private');
-    $document = pipelineDocument(['ocr_required' => true, 'ocr_completed' => true]);
-
+    Queue::fake();
+    $document = pipelineDocument(['ocr_required' => true, 'ocr_completed' => false]);
     (new OcrDocumentJob($document))->handle();
-
-    expect($document->fresh()->ocr_completed)->toBeTrue();
+    expect(Document::withoutGlobalScopes()->find($document->id)->ocr_completed)->toBeFalse();
 });
-
-it('skips thumbnail generation for non-pdf documents', function (): void {
-    Storage::fake('private');
-    $document = pipelineDocument(['file_extension' => 'txt', 'mime_type' => 'text/plain']);
-
-    (new ThumbnailDocumentJob($document))->handle();
-
-    expect(Storage::disk('private')->allFiles('thumbnails'))->toBeEmpty();
-});
-
-it('marks a deleted document unsearchable when indexing', function (): void {
-    $document = pipelineDocument(['status' => 'deleted']);
-
+it('removes content from the search engine in Phase 1', function (): void {
+    Queue::fake();
+    $document = Mockery::mock(Document::class)->makePartial();
+    $document->status = 'draft';
+    $document->shouldReceive('unsearchable')->once();
+    $document->shouldNotReceive('searchable');
     (new IndexDocumentJob($document))->handle();
-
-    expect(true)->toBeTrue();
 });

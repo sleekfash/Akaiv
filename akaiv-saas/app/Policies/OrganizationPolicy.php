@@ -7,7 +7,7 @@ use App\Models\User;
 
 class OrganizationPolicy
 {
-    public function before(User $user, string $ability): bool|null
+    public function before(User $user, string $ability): ?bool
     {
         if ($user->hasRole('Platform SuperAdmin')) {
             return true;

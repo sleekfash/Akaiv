@@ -1,12 +1,14 @@
 <?php
 
 use App\Models\Document;
+use App\Models\Folder;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function (): void {
     Queue::fake();
@@ -76,7 +78,7 @@ it('auto-sets organization_id on create from the active organization', function 
     $this->actingAs($user);
     session(['active_organization_id' => $org->id]);
 
-    $folder = \App\Models\Folder::create(['name' => 'Filings']);
+    $folder = Folder::create(['name' => 'Filings']);
 
     expect((int) $folder->organization_id)->toBe($org->id);
 });

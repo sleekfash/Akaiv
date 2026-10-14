@@ -1,3 +1,5 @@
+> Phase 1 instructions and release gates are authoritative in [REMEDIATION_RUNBOOK.md](REMEDIATION_RUNBOOK.md). The scaffold instructions below describe an empty development environment; do not run fresh permission setup or regenerate keys against an existing system. OCR/AI are disabled and the historical Spatie log is unchained.
+
 # AKAIV Archives SaaS — Scaffold Quickstart
 
 This folder (`akaiv-saas/`) is the **GREENFIELD Laravel 11 + Filament 3 + PostgreSQL 16** rebuild of `myarchivesonline.com`.
