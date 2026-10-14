@@ -1,5 +1,7 @@
 # Judicial Phase 1 remediation
 
+Dependency-security candidate (2026-10-14): Laravel12/CommonMark patches and compatible frontend lockfile updates are tracked in `../docs/audits/DEPENDENCY_REMEDIATION_20261014.md`. Older version/test counts below are historical. A clean PHP audit does not resolve the remaining frontend/worker advisories or authorize production deployment. Do not execute legacy scaffold OCR/AI/public-sharing or live-import instructions.
+
 This change continues Laravel/Filament and preserves the legacy files. No live migration, deployment, archive import, credential rotation or history rewrite has been executed.
 
 ## Safe review sequence

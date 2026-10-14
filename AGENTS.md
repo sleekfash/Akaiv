@@ -2,7 +2,7 @@
 
 ## Repository Layout
 
-- `akaiv-saas/` is the active greenfield application: Laravel 11, PHP 8.3, Filament 3, PostgreSQL, Redis, Meilisearch, and Docker Compose.
+- `akaiv-saas/` is the active application: Laravel 12, PHP 8.3, Filament 3, PostgreSQL, Redis, and Docker Compose. Meilisearch/OCR/AI remain inactive in Phase 1.
 - `myarchivesonline.com/` is the legacy Laravel 6 application. Treat it as a compatibility-sensitive reference and do not apply Laravel 11 conventions there unless a task explicitly targets it.
 - Root-level `README.md`, `README_QUICKSTART.md`, checkpoints, and roadmap files describe project status and operational context.
 - The active app's operational setup is documented in [akaiv-saas/README_QUICKSTART.md](akaiv-saas/README_QUICKSTART.md); consult it instead of duplicating setup details here.
