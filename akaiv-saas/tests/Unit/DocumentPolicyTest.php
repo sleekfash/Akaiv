@@ -5,9 +5,11 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Policies\DocumentPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 function policyUser(string $email): User
 {
@@ -33,6 +35,7 @@ function policyDocument(int $organizationId, int $ownerId): Document
 }
 
 beforeEach(function (): void {
+    Queue::fake();
     Permission::create(['name' => 'document.view', 'guard_name' => 'web']);
     Permission::create(['name' => 'document.download', 'guard_name' => 'web']);
 });
@@ -46,6 +49,8 @@ it('allows an owner to view a document in the active organization', function ():
     $user = policyUser('owner@example.test');
     $document = policyDocument($organization->id, $user->id);
 
+    $user->organizations()->attach($organization->id, ['role' => 'member_write']);
+    $this->actingAs($user);
     session(['active_organization_id' => $organization->id]);
 
     expect((new DocumentPolicy)->view($user, $document))->toBeTrue();
@@ -80,6 +85,8 @@ it('requires download permission even when viewing is allowed', function (): voi
     $user->givePermissionTo('document.view');
     $document = policyDocument($organization->id, $user->id);
 
+    $user->organizations()->attach($organization->id, ['role' => 'member_write']);
+    $this->actingAs($user);
     session(['active_organization_id' => $organization->id]);
 
     expect((new DocumentPolicy)->view($user, $document))->toBeTrue()

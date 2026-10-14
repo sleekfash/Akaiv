@@ -23,9 +23,10 @@ class IndexDocumentJob implements ShouldQueue
     {
         if ($this->document->status === 'deleted') {
             $this->document->unsearchable();
+
             return;
         }
 
-        $this->document->searchable();
+        $this->document->unsearchable(); // Phase 1 searches authorized metadata in PostgreSQL, not document content.
     }
 }
