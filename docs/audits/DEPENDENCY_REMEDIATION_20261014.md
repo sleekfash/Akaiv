@@ -38,3 +38,9 @@ Legacy prior scan34 advisory records remains a separate owner-controlled operati
 ## Verification checkpoint
 
 Candidate PHP/PostgreSQL/browser verification pending. Exact commit/run IDs and executed results will be recorded here. Current classification: partial remediation READY FOR REVIEW; full dependency-security acceptance BLOCKED by unresolved npm findings/access. No production readiness claim.
+
+## Runtime lifecycle and first CI security gate
+
+Node20 is end-of-life per https://nodejs.org/en/about/eol and the official release schedule. Prepared CI/pilot/Docker build references now use supported Node22, with root .node-version for developers. No Docker build was executed here (Docker unavailable); Docker base-image/system-package vulnerability scanning remains unverified. PHP8.3 runtime is retained. Local frontend tests/build used Node24.19.0; updated Node22 CI compatibility must execute before claiming it passed.
+
+Commit a21251f6146e178cceb985a677996f3a4b5b12b4: dependency-security run38605109581 PHP audit job115993866636 passed (strict manifest validation, advisories[], abandoned[]). Frontend job115993867178 failed with12 nodes (9 high/3 moderate); worker job115993867171 failed with19 nodes (3 critical/10 high/6 moderate). This worker response differs from the22-node local response on unchanged lockfile; no clean result can be inferred from either and no cause of registry/advisory response variance is established. Failed npm acceptance is preserved explicitly, not downgraded or ignored. Standard CI38605109473 and pilot38605109561 initially ran on Node20; revised runtime candidate requires a fresh run.

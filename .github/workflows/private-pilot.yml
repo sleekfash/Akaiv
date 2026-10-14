@@ -71,7 +71,7 @@ jobs:
           coverage: none
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install and build
         run: |
           mkdir -p storage/framework/{cache,sessions,views} storage/logs
