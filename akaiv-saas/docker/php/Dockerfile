@@ -61,10 +61,10 @@ COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 # ------------------------------
 # Node.js + npm (for Vite builds)
 # ------------------------------
-COPY --from=node:20-alpine /usr/lib /usr/lib
-COPY --from=node:20-alpine /usr/bin /usr/bin
-COPY --from=node:20-alpine /opt /opt
-COPY --from=node:20-alpine /root /root
+COPY --from=node:22-alpine /usr/lib /usr/lib
+COPY --from=node:22-alpine /usr/bin /usr/bin
+COPY --from=node:22-alpine /opt /opt
+COPY --from=node:22-alpine /root /root
 ENV PATH="/root/.npm-global/bin:$PATH"
 
 # ------------------------------

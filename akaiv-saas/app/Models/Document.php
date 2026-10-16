@@ -2,18 +2,21 @@
 
 namespace App\Models;
 
+use App\Concerns\AuditsArchiveRecords;
 use App\Concerns\BelongsToOrganization;
+use App\Scopes\ArchiveVisibilityScope;
+use App\Services\ArchiveAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -21,15 +24,21 @@ use Spatie\Tags\HasTags;
 
 class Document extends Model implements HasMedia
 {
-    use HasFactory;
-    use SoftDeletes;
+    use AuditsArchiveRecords;
     use BelongsToOrganization;
-    use Searchable;
-    use LogsActivity;
-    use InteractsWithMedia;
+    use HasFactory;
     use HasTags;
+    use InteractsWithMedia;
+    use LogsActivity;
+    use Searchable;
+    use SoftDeletes;
 
     protected $fillable = [
+        'proceeding_id',
+        'date_delivered',
+        'judicial_document_type',
+        'scan_state',
+        'file_revision',
         'uuid',
         'organization_id',
         'workspace_id',
@@ -66,6 +75,7 @@ class Document extends Model implements HasMedia
     ];
 
     protected $casts = [
+        'date_delivered' => 'date',
         'size_bytes' => 'integer',
         'metadata' => 'array',
         'ocr_required' => 'boolean',
@@ -83,11 +93,22 @@ class Document extends Model implements HasMedia
     protected static function booted(): void
     {
         parent::booted();
+        static::addGlobalScope(new ArchiveVisibilityScope);
+        static::saving(function (self $document) {
+            if ($document->case_id && $document->proceeding_id) {
+                abort(422, 'Choose one parent.');
+            }
+            foreach (['case_id' => CaseFile::class, 'proceeding_id' => CaseProceeding::class, 'folder_id' => Folder::class, 'workspace_id' => Workspace::class] as $field => $class) {
+                if ($document->$field && ! $class::withoutGlobalScopes()->whereKey($document->$field)->where('organization_id', $document->organization_id)->whereNull('deleted_at')->exists()) {
+                    abort(422, 'Invalid parent tenant.');
+                }
+            }
+        });
         static::creating(function (self $document) {
             if (empty($document->uuid)) {
                 $document->uuid = (string) Str::uuid();
             }
-            if (empty($document->slug) && !empty($document->friendly_name)) {
+            if (empty($document->slug) && ! empty($document->friendly_name)) {
                 $document->slug = Str::slug($document->friendly_name);
             }
         });
@@ -108,6 +129,11 @@ class Document extends Model implements HasMedia
             ->dontSubmitEmptyLogs();
     }
 
+    public function shouldBeSearchable(): bool
+    {
+        return false;
+    }
+
     public function toSearchableArray(): array
     {
         return [
@@ -117,7 +143,7 @@ class Document extends Model implements HasMedia
             'original_filename' => $this->original_filename,
             'folio_number' => $this->folio_number,
             'description' => $this->description,
-            'extracted_text' => $this->extracted_text ?? '',
+            'extracted_text' => '',
             'status' => $this->status,
             'organization_id' => $this->organization_id,
             'folder_id' => $this->folder_id,
@@ -133,6 +159,11 @@ class Document extends Model implements HasMedia
     {
         return $query->where('status', '!=', 'deleted')
             ->whereNotNull('organization_id');
+    }
+
+    public function proceeding()
+    {
+        return $this->belongsTo(CaseProceeding::class);
     }
 
     public function workspace(): BelongsTo
@@ -182,7 +213,7 @@ class Document extends Model implements HasMedia
 
     public function activity(): MorphMany
     {
-        return $this->morphMany(config('activitylog.activity_model', \Spatie\Activitylog\Models\Activity::class), 'subject');
+        return $this->morphMany(config('activitylog.activity_model', Activity::class), 'subject');
     }
 
     public function incrementDownloadCount(): void
@@ -203,16 +234,7 @@ class Document extends Model implements HasMedia
 
     public function isViewableBy(User $user): bool
     {
-        if ($user->hasRole('Platform SuperAdmin')) {
-            return true;
-        }
-        $activeOrg = session('active_organization_id');
-        if ($activeOrg === null || (int)$this->organization_id !== (int)$activeOrg) {
-            return false;
-        }
-        return $user->hasPermissionTo('document.view')
-            || (int)$this->owner_id === (int)$user->id
-            || $user->hasPermissionTo('document.view_any');
+        return app(ArchiveAccess::class)->document($user, $this);
     }
 
     public function getRouteKeyName(): string

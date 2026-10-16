@@ -4,6 +4,8 @@ export default defineWorkersConfig({
   test: {
     poolOptions: {
       workers: {
+        // The disabled worker is stateless; avoid DO SQLite snapshot cleanup in this harness.
+        isolatedStorage: false,
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           bindings: {

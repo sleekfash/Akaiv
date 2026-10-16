@@ -1,0 +1,80 @@
+name: Private preview setup
+on:
+  push:
+    branches: ['codex/private-preview-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build actual Codespaces runtime
+        run: |
+          docker build -t akaiv-preview-runtime -f .devcontainer/Dockerfile .
+          docker run --rm akaiv-preview-runtime bash -c 'php -v && node --version && npm --version && composer --version && php -m'
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      AKAIV_PREVIEW_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_pgsql, bcmath, exif, pcntl, zip, gd, redis
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install preview runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php8.3-fpm nginx supervisor rsync
+          sudo systemctl stop nginx php8.3-fpm supervisor
+      - name: Validate setup syntax
+        run: |
+          bash -n .devcontainer/post-create.sh .devcontainer/preview/start.sh
+          python3 -m py_compile .devcontainer/preview/prepare.py .devcontainer/preview/render.py
+          php -l .devcontainer/preview/seed.php
+          php -l .devcontainer/preview/guard.php
+          python3 .devcontainer/preview/test_prepare.py
+      - name: Build isolated preview
+        run: bash .devcontainer/post-create.sh
+      - name: Real preview queue and storage
+        working-directory: .preview/app
+        run: |
+          set -a
+          source .env
+          set +a
+          php ../../.devcontainer/preview/services.php
+      - name: Browser checks
+        working-directory: .preview/app
+        run: |
+          npx playwright install --with-deps chromium
+          cp ../../.devcontainer/preview/smoke.mjs preview-smoke.mjs
+          node preview-smoke.mjs
+      - name: Verify repeat setup preserves credentials and records
+        run: |
+          sha256sum .preview/app/.env .preview/logins.json > /tmp/preview-state.sha256
+          bash .devcontainer/post-create.sh
+          sha256sum -c /tmp/preview-state.sha256
+          cd .preview/app
+          set -a
+          source .env
+          set +a
+          php ../../.devcontainer/preview/services.php
+          node preview-smoke.mjs
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          for file in .preview/fpm-error.log .preview/nginx-error.log .preview/queue.log .preview/app/storage/logs/laravel.log; do
+            test ! -f "$file" || tail -60 "$file"
+          done

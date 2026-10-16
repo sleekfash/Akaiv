@@ -1,0 +1,41 @@
+name: Dependency security
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  php-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: akaiv-saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Validate manifest and audit the PHP lockfile
+        run: |
+          composer validate --strict --no-check-publish
+          composer audit --locked --format=json
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [akaiv-saas, workers/agents-service]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit the complete JavaScript lockfile including tooling
+        run: npm audit --package-lock-only --audit-level=low --json
