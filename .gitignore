@@ -43,3 +43,6 @@ yarn-error.log
 .php-cs-fixer.cache
 .pest.cache
 coverage/
+
+# Isolated Codespaces preview: credentials, dependencies and sample records
+/.preview/
