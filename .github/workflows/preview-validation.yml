@@ -6,6 +6,17 @@ on:
 permissions:
   contents: read
 jobs:
+  runtime-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build actual Codespaces runtime
+        run: |
+          docker build -t akaiv-preview-runtime -f .devcontainer/Dockerfile .
+          docker run --rm akaiv-preview-runtime bash -c 'php -v && node --version && npm --version && composer --version && php -m'
   preview:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -37,6 +48,13 @@ jobs:
           python3 .devcontainer/preview/test_prepare.py
       - name: Build isolated preview
         run: bash .devcontainer/post-create.sh
+      - name: Real preview queue and storage
+        working-directory: .preview/app
+        run: |
+          set -a
+          source .env
+          set +a
+          php ../../.devcontainer/preview/services.php
       - name: Browser checks
         working-directory: .preview/app
         run: |
@@ -49,6 +67,10 @@ jobs:
           bash .devcontainer/post-create.sh
           sha256sum -c /tmp/preview-state.sha256
           cd .preview/app
+          set -a
+          source .env
+          set +a
+          php ../../.devcontainer/preview/services.php
           node preview-smoke.mjs
       - name: Failure diagnostics
         if: failure()
