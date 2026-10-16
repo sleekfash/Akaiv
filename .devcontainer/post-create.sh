@@ -12,6 +12,7 @@ docker compose --env-file .env -f "$root/.devcontainer/preview/compose.yml" up -
 composer install --no-interaction --prefer-dist --no-progress
 npm ci --no-audit --no-fund
 npm run build
+php "$root/.devcontainer/preview/guard.php"
 php artisan migrate --force
 php "$root/.devcontainer/preview/seed.php"
 touch "$root/.preview/ready"

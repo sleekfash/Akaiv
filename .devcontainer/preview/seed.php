@@ -12,6 +12,8 @@ require $root.'/.preview/app/vendor/autoload.php';
 $app = require $root.'/.preview/app/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 if (! app()->environment('pilot') || config('database.connections.pgsql.database') !== 'akaiv_preview_pilot_test'
+    || config('database.connections.pgsql.host') !== '127.0.0.1'
+    || config('database.connections.pgsql.url')
     || config('filesystems.disks.s3.endpoint') !== 'http://127.0.0.1:9000') {
     throw new RuntimeException('Disposable preview database and storage required.');
 }

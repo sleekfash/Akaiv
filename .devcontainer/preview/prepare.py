@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 import secrets
-import shutil
+import re
 import subprocess
 import sys
 
@@ -24,7 +24,11 @@ for name in ["bootstrap/cache", "storage/framework/cache/data", "storage/framewo
 env_path = app / ".env"
 codespace = os.environ.get("CODESPACE_NAME")
 domain = os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN", "app.github.dev")
+if codespace and (not re.fullmatch(r"[a-zA-Z0-9-]+", codespace) or not re.fullmatch(r"[a-zA-Z0-9.-]+", domain)):
+    raise SystemExit("Invalid Codespaces URL")
 url = f"https://{codespace}-8000.{domain}" if codespace else "http://127.0.0.1:8000"
+if env_path.exists() and not (state / "logins.json").exists():
+    raise SystemExit("Preview login record missing; refusing to replace existing credentials")
 if env_path.exists():
     values = dict(line.split("=", 1) for line in env_path.read_text().splitlines() if "=" in line)
     if values.get("DB_DATABASE") != "akaiv_preview_pilot_test" or values.get("APP_ENV") != "pilot":
@@ -43,7 +47,10 @@ else:
                   AWS_BUCKET="akaiv-preview", AWS_ACCESS_KEY_ID="preview",
                   AWS_SECRET_ACCESS_KEY=secrets.token_hex(24), AWS_USE_PATH_STYLE_ENDPOINT="true",
                   FILESYSTEM_DISK="s3", PILOT_TEST_MODE="1")
-values.update(APP_URL=url, ASSET_URL=url, SESSION_SECURE_COOKIE="true" if codespace else "false")
+values.update(APP_URL=url, ASSET_URL=url, SESSION_SECURE_COOKIE="true" if codespace else "false",
+              DB_URL="null", REDIS_URL="null", REDIS_PORT="6379", REDIS_USERNAME="null",
+              REDIS_DB="0", REDIS_CACHE_DB="1", SESSION_DOMAIN="null", AWS_URL="null",
+              AWS_SESSION_TOKEN="null", DOCUMENT_AGENT_URL="null", DOCUMENT_AGENT_SECRET="null")
 env_path.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
 env_path.chmod(0o600)
 (state / "initialized").touch(mode=0o600)

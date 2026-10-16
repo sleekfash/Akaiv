@@ -33,6 +33,8 @@ jobs:
           bash -n .devcontainer/post-create.sh .devcontainer/preview/start.sh
           python3 -m py_compile .devcontainer/preview/prepare.py .devcontainer/preview/render.py
           php -l .devcontainer/preview/seed.php
+          php -l .devcontainer/preview/guard.php
+          python3 .devcontainer/preview/test_prepare.py
       - name: Build isolated preview
         run: bash .devcontainer/post-create.sh
       - name: Browser checks
